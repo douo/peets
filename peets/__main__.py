@@ -8,6 +8,8 @@ from itertools import chain, filterfalse
 
 from guessit import guessit
 
+from peets.scraper import search, fill
+
 MOVIE_CONTAINERS = [
         "3g2",
         "3gp",
@@ -65,7 +67,7 @@ def _create_movie(movie_file:Path)->Movie:
     one file one movie
     """
     guess = guessit(movie_file)
-
+    print(guess)
     return Movie(
         title = guess["title"],
         year = guess["year"],
@@ -77,9 +79,15 @@ def main():
     parser = ArgumentParser(description="scrape movie")
     parser.add_argument('targets', type=Path, nargs='+')
     args = parser.parse_args()
-    movie_set:list[Movie] = [_create_movie(f)
+    movie_set:Iterator[Movie] = (_create_movie(f)
               for f in chain(*map(_file_traverse, args.targets))
-              if _movie_filter(f)]
-    breakpoint()
+              if _movie_filter(f))
+
+    for m in movie_set:
+        breakpoint()
+        results = search(m)
+        fill(m, results[0]["id"])
+
+
 if __name__ == "__main__":  # pragma: no cover
     main()
