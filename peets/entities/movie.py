@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 from uuid import UUID
 from peets.entities.media_certification import MediaCertification
+from peets.entities.media_entity import MediaEntity
 from peets.entities.media_trailer import MediaTrailer
 from peets.entities.media_genres import MediaGenres
 from peets.entities.person import Person
@@ -15,9 +16,8 @@ class MovieSet:
 
 
 
-@dataclass
-class Movie:
-    ids:dict[str, str] = field(default_factory=dict)
+@dataclass(kw_only=True)
+class Movie(MediaEntity):
     sort_title: str = ""
     tagline:str = ""
     runtime:int = 0
@@ -25,7 +25,7 @@ class Movie:
     playcount:int = 0
     isDisc:bool = False
     spoken_languages:str = ""
-    contry:str = ""
+    country:str = ""
     release_date:str = ""
     multi_movie_dir:bool = False
     top250:int = 0
