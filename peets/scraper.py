@@ -1,16 +1,30 @@
-from dataclasses import dataclass
 from datetime import datetime
 from tmdbsimple.movies import Movies
 from peets.entities.media_artwork import MediaArtwork, MediaArtworkType
 from peets.entities.movie import Movie
 from peets.entities.media_entity import MediaRating
+from peets.merger import replace
 import tmdbsimple as tmdb
-from typing import Any
-from itertools import chain
+
 tmdb.API_KEY = "42dd58312a5ca6dd8339b6674e484320"
 
 
-def search(movie:Movie):
+def _enable_log():
+    import logging
+    try: # for Python 3
+        from http.client import HTTPConnection
+    except ImportError:
+        from httplib import HTTPConnection
+    HTTPConnection.debuglevel = 1
+    logging.basicConfig()
+    logging.getLogger().setLevel(logging.DEBUG)
+    requests_log = logging.getLogger("requests.packages.urllib3")
+    requests_log.setLevel(logging.DEBUG)
+    requests_log.propagate = True
+
+# _enable_log()
+
+def search(movie: Movie):
     api = tmdb.Search()
     resp = api.movie(
         query = movie.title,
@@ -22,19 +36,22 @@ def search(movie:Movie):
          print(s['title'], s['id'], s['release_date'], s['popularity'])
     return results
 
-def fill(movie:Movie, _id:int):
+def fill(movie: Movie, _id: int) -> Movie:
     p_id = "tmdb"
     artwork_base_url = "https://image.tmdb.org/t/p/"
     language = "zh-CN"
     api = tmdb.Movies(_id)
-    context = api.info(language=language)
+    context = api.info(
+        language=language,
+        append_to_response="credits,keywords,release_dates,translations"
+    )
+    # breakpoint()
 
-
-    map_table = [
-        ("overview", "plot", None),
+    table = [
+        ("overview", "plot"),
         (("vote_average", "vote_count"),
          "ratings",
-         lambda va, vc : MediaRating(rating_id = "tmdb", rating=va, votes=vc)
+         lambda va, vc : ("tmdb", MediaRating(rating_id = "tmdb", rating=va, votes=vc))
          ),
         (("poster_path", "id"), "artwork_url_map",  #TODO download
          lambda path, id: (MediaArtworkType.POSTER, f"{artwork_base_url}w342{path}")
@@ -65,44 +82,4 @@ def fill(movie:Movie, _id:int):
         ("keywords", "tags", None)
     ]
 
-    _merge_json(movie, context, map_table)
-
-def _make_sure_tuple(obj) -> tuple[Any]:
-    return obj if isinstance(obj, tuple) else(obj,)
-
-def _merge_json(base:Movie, addon:dict[str,Any], map_table:list[tuple]):
-    # make sure all item is tuple
-    _map_table = list(map(lambda i: tuple(map(lambda j:  _make_sure_tuple(j), i)), map_table))
-
-    used = set(chain(*map(lambda i: i[0], _map_table)))
-
-    base_fields = base.__dataclass_fields__
-
-    _map_table += [((k,), (k,), (None,)) for k in addon.keys() if k not in used and k in base_fields]
-
-    for item in _map_table:
-        key, target, converter = item
-        print(item)
-        values = tuple(map(addon.get, key))
-        for attr, conv in zip(target, converter):
-            v = conv(*values) if conv is not None else values[0]
-            _field = base_fields[attr]
-            if _field.type is list:
-                _v = getattr(base, attr)
-                if _v is None:
-                    setattr(base, attr, v if isinstance(v, list) else [v])
-                elif isinstance(v, list):
-                    setattr(base, attr, v)
-                else:
-                    _v.append(v)
-            elif _field.type is dict:
-                _v = getattr(base, attr)
-                if isinstance(v, dict):
-                    setattr(base, attr, v)
-                elif isinstance(v, tuple) and len(v) == 2:
-                    if _v is None:
-                        _v = dict()
-                        setattr(base, attr, _v)
-                    _v[v[0]] = v[1]
-            else:
-                setattr(base, attr, v)
+    return replace(movie, context, table)

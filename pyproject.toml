@@ -10,5 +10,13 @@ dependencies = [
     "lxml",
     "tmdbsimple == 2.9.1",
     "reflink == 0.2.1",
-    "guessit"
+    "guessit",
+    "teletype"
+]
+
+[project.optional-dependencies]
+# pip install -e '.[tests]'
+tests = [
+  'pytest',
+  'pytest-mock'
 ]
