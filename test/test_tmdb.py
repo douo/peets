@@ -1,4 +1,5 @@
-from peets.scraper import fill
+from peets.tmdb import fill
+from peets.nfo import write_nfo
 from peets.entities.movie import Movie
 import os
 import json
@@ -14,10 +15,13 @@ def test_fill(datadir, mocker):
         return_value=data
     )
 
-    _id = 6160
-    m = fill(Movie(), _id)
+    m = fill(Movie(), 0)
 
+    m.ids["imdb"] =  data["imdb_id"]
+    m.ids["tmdb"] = data["id"]
 
+    xml = write_nfo(m)
+    print(xml)
 
 @fixture
 def datadir(tmpdir, request):

@@ -10,9 +10,9 @@ class Type(Enum):
 
 @dataclass
 class Person:
-    persion_type:Type = Type.OTHER
-    name:str = ""
-    role:str = ""
-    thumb_url:str = ""
-    profile_url:str = ""
-    ids:dict = field(default_factory=dict)
+    persion_type: Type = Type.OTHER
+    name: str = ""
+    role: str | None = None
+    thumb_url: str | None = None
+    profile_url: str | None = None
+    ids: dict = field(default_factory=dict)
