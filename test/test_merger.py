@@ -84,9 +84,9 @@ def test_to_kwargs():
         "level" : 2
     }
     assert to_kwargs(People, addon, [
-        (("title", "level"), "title",
-         lambda title, level: f"{title},{level}"
-         )
+        (("title", "level"),
+         "title",
+         lambda title, level: f"{title},{level}")
     ]) == {
         "name" : "Name",
         "age" : 30,
@@ -308,6 +308,39 @@ def test_create():
 
     for i, e in enumerate(dep.employee):
         assert e.name == kwargs_["employee"][i]["name"]
+
+    kwargs_ = {
+        "name": "Demo",
+        "manager": People(
+            name= "Demo",
+            pets= ["dog", "cat"]
+        ),
+        "employee": [
+            People(
+                name= "W1",
+                pets= ["dog"]
+            ),
+            People(
+                name= "W2",
+                title= "L",
+                tools= {"pen": 1}
+            )
+        ],
+        "position": {
+            1: People(
+                name= "P1",
+                title= "P")
+        }
+    }
+
+    dep = create(Department, kwargs_)
+
+    assert dep.name == kwargs_["name"]
+    assert dep.manager.name == kwargs_["manager"].name
+    assert dep.position[1].name == kwargs_["position"][1].name
+
+    for i, e in enumerate(dep.employee):
+        assert e.name == kwargs_["employee"][i].name
 
 def test_replace():
     p = People(name="Hello", level=1)

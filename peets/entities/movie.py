@@ -8,8 +8,8 @@ from peets.entities.media_genres import MediaGenres
 from peets.entities.person import Person
 
 
-@dataclass
-class MovieSet:
+@dataclass(kw_only=True)
+class MovieSet(MediaEntity):
     movie_ids:list[UUID] = field(default_factory=list)
     movies:list["Movie"] = field(default_factory=list)
     title_sortable:str = ""
@@ -32,7 +32,7 @@ class Movie(MediaEntity):
     media_source:str = ""  #TODO see guessit.rules.properties.source
     video_in_3d:bool = False
     certification:MediaCertification = MediaCertification.UNKNOWN
-    movie_set_id:Optional[UUID] = None
+    movie_set_id:UUID | None = None
     edition:str = ""  # TODO see guessit.rules.properties.edition
     stacked:bool = False
     offline:bool = False
@@ -45,7 +45,7 @@ class Movie(MediaEntity):
     writers:list[Person]  =  field(default_factory=list)
     trailer:list[MediaTrailer] = field(default_factory=list)
     showlinks:list[str] = field(default_factory=list)
-    movie_set:Optional[MovieSet] = None
+    movie_set: MovieSet | None = None
     title_sortable:str = ""
     original_title_sortable = ""
     other_ids = ""

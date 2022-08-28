@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Optional
 from uuid import UUID, uuid4
 from datetime import date
 from enum import Enum, auto
@@ -39,32 +38,32 @@ class MediaFileType(Enum):
 
 @dataclass
 class MediaRating:
-    rating_id:str = ""
-    rating:int = -1
-    votes:int = 0
-    maxValue:int = 10
+    rating_id: str = ""
+    rating: int = -1
+    votes: int = 0
+    max_value: int = 10
 
 @dataclass(kw_only=True)
 class MediaEntity:
-    dbid:UUID = uuid4()
-    locked:bool = False
-    dataSource:str = ""
-    ids:dict[str, str] = field(default_factory=dict)
-    title:str = ""
-    original_title:str = ""
-    year:int = 0
-    plot:str = ""
-    path:str = ""
-    dateAdded:date = date.today()
-    production_company:str = ""
-    scraped:bool = False
-    note:str = ""
-    ratings:dict[str,MediaRating] = field(default_factory=dict)
-    media_files:list[str] = field(default_factory=list)
-    tags:list[str] = field(default_factory=list)
-    artwork_url_map:dict[MediaFileType, str] = field(default_factory=dict)
-    original_filename:str = ""
-    last_scraper_id:str = ""
-    last_scrape_language:str = ""
-    newly_added:bool = False
-    duplicate:bool = False
+    dbid: UUID = uuid4()
+    locked: bool = False
+    data_source: str = ""
+    ids: dict[str, str] = field(default_factory=dict)
+    title: str = ""
+    original_title: str = ""
+    year: int = 0
+    plot: str = ""
+    path: str = ""
+    date_added: date = date.today()
+    production_company: str = ""
+    scraped: bool = False
+    note: str = ""
+    ratings: dict[str,MediaRating] = field(default_factory=dict)
+    media_files: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+    artwork_url_map: dict[MediaFileType, str] = field(default_factory=dict)
+    original_filename: str = ""
+    last_scraper_id: str = ""
+    last_scrape_language: str = ""
+    newly_added: bool = False
+    duplicate: bool = False
