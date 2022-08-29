@@ -1,10 +1,6 @@
 from datetime import datetime
 from tmdbsimple.movies import Movies
-from peets.entities.media_artwork import MediaArtwork, MediaArtworkType
-from peets.entities.media_genres import MediaGenres
-from peets.entities.movie import Movie
-from peets.entities.media_entity import MediaFileType, MediaRating
-from peets.entities.person import Person, Type as PersonType
+from peets.entities import Movie, MediaFileType, MediaRating, MediaGenres, MediaArtwork, MediaArtworkType, Person, PersonType
 from peets.merger import replace
 import tmdbsimple as tmdb
 

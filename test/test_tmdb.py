@@ -1,6 +1,6 @@
 from peets.tmdb import fill
 from peets.nfo import write_nfo
-from peets.entities.movie import Movie
+from peets.entities import Movie
 import os
 import json
 from distutils import dir_util

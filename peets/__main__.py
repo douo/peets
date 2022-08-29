@@ -8,8 +8,6 @@ from itertools import chain, filterfalse
 
 
 from peets.finder import traverse
-from peets.scraper import search, fill
-
 
 
 

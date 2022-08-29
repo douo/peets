@@ -6,8 +6,7 @@ from typing import Callable, Tuple, Any, cast
 from lxml import etree as ET
 from datetime import datetime
 
-from peets.entities.movie import Movie
-from peets.entities.media_entity import MediaFileType, MediaRating
+from peets.entities import Movie, MediaFileType, MediaRating
 
 
 def _uniqueid(root: ET.Element, movie: Movie):

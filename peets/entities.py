@@ -1,6 +1,81 @@
-from enum import Enum
+from dataclasses import dataclass, field
+from uuid import UUID, uuid4
+from datetime import date
+from enum import Enum, auto
 
-from peets.entities.country_code import CountryCode
+class CountryCode(Enum):
+    """ISO_3166-1 derive from
+
+    https://gitlab.com/tinyMediaManager/tinyMediaManager/-/blob/devel/src/main/java/org/tinymediamanager/scraper/entities/CountryCode.java
+    """
+    def __init__(self, country, alpha3, numeric) -> None:
+        self.country = country
+        self.alpha3 = alpha3
+        self.numeric = numeric
+
+    AU = ("Australia", "AUS", 36)
+
+    CA = ("Canada", "CAN", 124)
+
+    CH = ("Switzerland", "CHE", 756)
+
+    CN = ("China", "CHN", 156)
+
+    CZ = ("Czech Republic", "CZE", 203)
+
+    DE = ("Germany", "DEU", 276)
+
+    DK = ("Denmark", "DNK", 208)
+
+    EE = ("Estonia", "EST", 233)
+
+    ES = ("Spain", "ESP", 724)
+
+    FI = ("Finland", "FIN", 246)
+
+    FR = ("France", "FRA", 250)
+
+    GB = ("United Kingdom", "GBR", 826)
+
+    GR = ("Greece", "GRC", 300)
+
+    HK = ("Hong Kong", "HKG", 344)
+
+    HU = ("Hungary", "HUN", 348)
+
+    IE = ("Ireland", "IRL", 372)
+
+    IN = ("India", "IND", 356)
+
+    IS = ("Iceland", "ISL", 352)
+
+    IT = ("Italy", "ITA", 380)
+
+    JP = ("Japan", "JPN", 392)
+
+    MX = ("Mexico", "MEX", 484)
+
+    NL = ("Netherlands", "NLD", 528)
+
+    NO = ("Norway", "NOR", 578)
+
+    NZ = ("New Zealand", "NZL", 554)
+
+    PL = ("Poland", "POL", 616)
+
+    PT = ("Portugal", "PRT", 620)
+
+    RO = ("Romania", "ROU", 642)
+
+    RU = ("Russian Federation", "RUS", 643)
+
+    SE = ("Sweden", "SWE", 752)
+
+    TH = ("Thailand", "THA", 764)
+
+    US = ("United States", "USA", 840)
+
+    ZW = ("Zimbabwe", "ZWE", 716)
 
 class MediaCertification(Enum):
     """
@@ -233,3 +308,269 @@ class MediaCertification(Enum):
 
     NOT_RATED = (CountryCode.US, "not rated", [ "not rated", "NR" ])
     UNKNOWN = (None, "unknown", [ "unknown"]);
+
+
+class MediaGenres(Enum):
+    """ Genres from tinyMediaManager
+
+    https://gitlab.com/tinyMediaManager/tinyMediaManager/-/blob/devel/src/main/java/org/tinymediamanager/core/entities/MediaGenres.java
+    """
+    ACTION = auto()
+    ADVENTURE = auto()
+    ANIMATION = auto()
+    ANIME = auto()
+    ANIMAL = auto()
+    BIOGRAPHY = auto()
+    COMEDY = auto()
+    CRIME = auto()
+    DISASTER = auto()
+    DOCUMENTARY = auto()
+    DRAMA = auto()
+    EASTERN = auto()
+    EROTIC = auto()
+    FAMILY = auto()
+    FAN_FILM = auto()
+    FANTASY = auto()
+    FILM_NOIR = auto()
+    FOREIGN = auto()
+    GAME_SHOW = auto()
+    HISTORY = auto()
+    HOLIDAY = auto()
+    HORROR = auto()
+    INDIE = auto()
+    MINI_SERIES = auto()
+    MUSIC = auto()
+    MUSICAL = auto()
+    MYSTERY = auto()
+    NEO_NOIR = auto()
+    NEWS = auto()
+    REALITY_TV = auto()
+    ROAD_MOVIE = auto()
+    ROMANCE = auto()
+    SCIENCE_FICTION = auto()
+    SERIES = auto()
+    SHORT = auto()
+    SILENT_MOVIE = auto()
+    SOAP = auto()
+    SPORT = auto()
+    SPORTING_EVENT = auto()
+    SPORTS_FILM = auto()
+    SUSPENSE = auto()
+    TALK_SHOW = auto()
+    TV_MOVIE = auto()
+    THRILLER = auto()
+    WAR = auto()
+    WESTERN = auto()
+
+
+class MediaFileType(Enum):
+  VIDEO = auto()
+  TRAILER = auto()
+  SAMPLE = auto() #  sample != trailer
+  VIDEO_EXTRA = auto()
+  AUDIO = auto()
+  SUBTITLE = auto()
+  NFO = auto()
+  POSTER = auto() #  gfx
+  FANART = auto() #  gfx
+  BANNER = auto() #  gfx
+  CLEARART = auto() #  gfx
+  DISC = auto() #  gfx
+  LOGO = auto() #  gfx
+  CLEARLOGO = auto() #  gfx
+  THUMB = auto() #  gfx
+  CHARACTERART = auto() # gfx
+  KEYART = auto() #  gfx
+  SEASON_POSTER = auto() #  gfx
+  SEASON_FANART = auto() #  gfx
+  SEASON_BANNER = auto() #  gfx
+  SEASON_THUMB = auto() #  gfx
+  EXTRAFANART = auto() #  gfx
+  EXTRATHUMB = auto() #  gfx
+  EXTRA = auto()
+  GRAPHIC = auto() #  NO gfx (since not a searchable type)
+  MEDIAINFO = auto() #  xxx-mediainfo.xml
+  VSMETA = auto() #  xxx.ext.vsmeta Synology
+  THEME = auto() #  "theme" files for some skins = auto()like theme.mp3 (or bg video)
+  TEXT = auto() #  various text infos = auto()like BDinfo.txt or others...
+  DOUBLE_EXT = auto() #  the filename startsWith video filename (and added extension) = auto()so we keep them...
+  UNKNOWN = auto()
+
+@dataclass
+class MediaRating:
+    rating_id: str = ""
+    rating: int = -1
+    votes: int = 0
+    max_value: int = 10
+
+class MediaArtworkType(Enum):
+    """
+    The different types of artwork we know
+    """
+    BACKGROUND = auto()
+    BANNER = auto()
+    POSTER = auto()
+    ACTOR = auto()
+    SEASON_POSTER = auto()
+    SEASON_FANART = auto()
+    SEASON_BANNER = auto()
+    SEASON_THUMB = auto()
+    THUMB = auto()
+    CLEARART = auto()
+    KEYART = auto()
+    CHARACTERART = auto()
+    DISC = auto()
+    LOGO = auto()
+    CLEARLOGO = auto()
+    ALL = auto()
+
+class PosterSizes(Enum):
+    """
+     All available poster sizes
+    """
+
+    def __init__(self, text:str, order:int) -> None:
+        self.text = text
+        self.order = order
+
+
+    XLARGE = ("xlarge" + ": ~2000x3000px", 16)
+    LARGE = ("large" + ": ~1000x1500px", 8)
+    BIG = ("big" + ": ~500x750px", 4)
+    MEDIUM = ("medium" + ": ~342x513px", 2)
+    SMALL= ("small" + ": ~185x277px", 1)
+
+class FanartSizes(Enum):
+    """
+    All available fanart sizes
+    """
+    def __init__(self, text:str, order:int) -> None:
+        self.text = text
+        self.order = order
+
+
+    XLARGE = ("xlarge" + ": ~3840x2160px", 16)
+    LARGE = ("large" + ": ~1920x1080px", 8)
+    MEDIUM = ("medium" + ": ~1280x720px", 2)
+    SMALL= ("small" + ": ~300x168px", 1)
+
+@dataclass
+class ImageSizeAndUrl:
+    width:int
+    height:int
+    url:str
+
+@dataclass
+class MediaArtwork:
+    provider_id:str = ""
+    artwork_type:MediaArtworkType | None = None
+    imdbId:str = ""
+    tmdbId:int = 0
+    season:int = -1
+    preview_url:str = ""
+    default_url:str = ""
+    original_url:str = ""
+    language:str = ""
+    size_order:int = 0
+    likes:int = 0
+    animated:bool = False
+    image_sizes:list[ImageSizeAndUrl] = field(default_factory=list)
+
+
+@dataclass(kw_only=True)
+class MediaEntity:
+    dbid: UUID = uuid4()
+    locked: bool = False
+    data_source: str = ""
+    ids: dict[str, str] = field(default_factory=dict)
+    title: str = ""
+    original_title: str = ""
+    year: int = 0
+    plot: str = ""
+    path: str = ""
+    date_added: date = date.today()
+    production_company: str = ""
+    scraped: bool = False
+    note: str = ""
+    ratings: dict[str,MediaRating] = field(default_factory=dict)
+    media_files: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+    artwork_url_map: dict[MediaFileType, str] = field(default_factory=dict)
+    original_filename: str = ""
+    last_scraper_id: str = ""
+    last_scrape_language: str = ""
+    newly_added: bool = False
+    duplicate: bool = False
+
+
+@dataclass
+class MediaTrailer:
+    name:str = ""
+    url:str = ""
+    quality:str = ""
+    provider:str = ""
+    in_nfo:bool = False
+    date:str = ""
+
+
+class PersonType(Enum):
+    ACTOR = auto(),
+    DIRECTOR = auto(),
+    WRITER = auto(),
+    PRODUCER = auto(),
+    OTHER = auto()
+
+@dataclass
+class Person:
+    persion_type: PersonType = PersonType.OTHER
+    name: str = ""
+    role: str | None = None
+    thumb_url: str | None = None
+    profile_url: str | None = None
+    ids: dict = field(default_factory=dict)
+
+
+
+@dataclass(kw_only=True)
+class MovieSet(MediaEntity):
+    movie_ids:list[UUID] = field(default_factory=list)
+    movies:list["Movie"] = field(default_factory=list)
+    title_sortable:str = ""
+
+
+
+@dataclass(kw_only=True)
+class Movie(MediaEntity):
+    sort_title: str = ""
+    tagline:str = ""
+    runtime:int = 0
+    watched:bool = False
+    playcount:int = 0
+    isDisc:bool = False
+    spoken_languages:str = ""
+    country:str = ""
+    release_date:str = ""
+    multi_movie_dir:bool = False # 目录内是否有多个视频文件
+    top250:int = 0
+    media_source:str = ""  #TODO see guessit.rules.properties.source
+    video_in_3d:bool = False
+    certification:MediaCertification = MediaCertification.UNKNOWN
+    movie_set_id:UUID | None = None
+    edition:str = ""  # TODO see guessit.rules.properties.edition
+    stacked:bool = False
+    offline:bool = False
+    genres:list[MediaGenres] = field(default_factory=list)
+    extra_thumbs:list[str] = field(default_factory=list)
+    extra_fanarts:list[str] =  field(default_factory=list)
+    actors:list[Person]  =  field(default_factory=list)
+    producers:list[Person]  =  field(default_factory=list)
+    directors:list[Person]  =  field(default_factory=list)
+    writers:list[Person]  =  field(default_factory=list)
+    trailer:list[MediaTrailer] = field(default_factory=list)
+    showlinks:list[str] = field(default_factory=list)
+    movie_set: MovieSet | None = None
+    title_sortable:str = ""
+    original_title_sortable = ""
+    other_ids = ""
+    late_watched:str = "" # date
+    localized_spoken_languages:str = ""

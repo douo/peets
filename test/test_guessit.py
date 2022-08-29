@@ -1,5 +1,5 @@
 from pathlib import Path
-from peets.entities.movie import Movie
+from peets.entities import Movie
 
 from peets.guessit import create_entity
 from guessit import guessit

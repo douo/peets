@@ -5,7 +5,7 @@ from typing_inspect import get_args, get_origin, is_generic_type, is_union_type
 from itertools import chain
 from dataclasses import replace as data_replace
 from attr import attrib
-from peets.entities.media_entity import MediaEntity
+from peets.entities import MediaEntity
 from abc import ABCMeta, abstractmethod
 
 
