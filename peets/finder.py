@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Iterator
 from itertools import chain
-from peets.const import SUBTITLE_CONTAINERS, VIDEO_CONTAINERS
+from peets.const import ARTWORK_FILE_TYPE, SUBTITLE_CONTAINERS, VIDEO_CONTAINERS
 
 
 def is_video(path: Path) -> bool:
@@ -9,6 +9,9 @@ def is_video(path: Path) -> bool:
 
 def is_subtitle(path: Path) -> bool:
     return path.suffix[1:] in SUBTITLE_CONTAINERS
+
+def is_artwork_file(path: Path) -> bool:
+    return path.suffix[1:] in ARTWORK_FILE_TYPE
 
 def _file_traverse(target:Path)->Iterator[Path]:
     if target.is_dir():

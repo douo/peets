@@ -3,11 +3,14 @@ from pathlib import Path
 from typing import Iterator
 
 
-from peets.entities.movie import Movie
+from peets.entities import Movie
+from peets.finder import traverse
+from peets.guessit import create_entity
+from peets.ui import interact
 from itertools import chain, filterfalse
 
 
-from peets.finder import traverse
+
 
 
 
@@ -16,14 +19,14 @@ def main():
     parser.add_argument('targets', type=Path, nargs='+')
     args = parser.parse_args()
     media_files = traverse(*args.targets)
-    movie_set:Iterator[Movie] = (_create_movie(f)
-              for f in chain(*map(_file_traverse, args.targets))
-              if _movie_filter(f))
+
+    movie_set:Iterator[Movie] = (e for e in (create_entity(f)
+                                            for f in chain(*map(traverse, args.targets))
+                                             )
+                                 if isinstance(e, Movie))
 
     for m in movie_set:
-        breakpoint()
-        results = search(m)
-        fill(m, results[0]["id"])
+        interact(m)
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -42,3 +42,13 @@ SUBTITLE_CONTAINERS = [
         "ssa",
         "ass"
       ]
+
+ARTWORK_FILE_TYPE = {
+    "jpg",
+    "jpeg",
+    "png",
+    "tnb",
+    "gif",
+    "bmp",
+    "webp"
+}
