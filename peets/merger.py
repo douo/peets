@@ -1,7 +1,7 @@
 from sys import meta_path
 from types import NoneType, UnionType
 from typing import Generic, Protocol, Iterable, Sequence, Type, Any, TypeGuard, Union, Callable, get_type_hints, runtime_checkable, TypeVar, cast, TypeAlias
-from typing_inspect import get_args, get_origin, is_generic_type, is_union_type
+from typing_inspect import get_args, get_origin, is_generic_type, is_tuple_type, is_union_type
 from itertools import chain
 from dataclasses import replace as data_replace
 from attr import attrib
@@ -60,10 +60,11 @@ def _is_assignable(v_type: type, f_type: type) -> bool:
     """
     检查类型是否能赋值给目标类型
     """
-    print(f"{v_type}/{f_type}")
+    # print(f"{v_type}/{f_type}")
     return (f_type is Any or # 任何值都可以赋予 Any
             # 因为类型擦除，运行时无法区分 List[str] 和 List[int]，
             # get_origin(f_type) is v_type or
+            (v_type is tuple and is_tuple_type(f_type)) or
             not is_generic_type(f_type) and
             issubclass(v_type, f_type))
 

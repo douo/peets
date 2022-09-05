@@ -9,6 +9,7 @@ dependencies = [
     "typing_inspect",  # 运行时泛型内省（introspection）
     "requests",
     "lxml",
+    "regex",
     "tmdbsimple == 2.9.1",
     "reflink == 0.2.1",
     "guessit",

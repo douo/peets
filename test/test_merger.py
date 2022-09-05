@@ -1,7 +1,7 @@
 import pytest
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, get_type_hints
+from typing import get_type_hints
 
 from peets.merger import FieldNotExistError, to_kwargs, replace, TypeNotMatchError, create
 
@@ -9,20 +9,21 @@ from peets.merger import FieldNotExistError, to_kwargs, replace, TypeNotMatchErr
 @dataclass(kw_only=True, frozen=True)
 class People:
     name: str = field(kw_only=False)
-    title: Optional[str] = None
+    title: str | None = None
     level: int = 0
-    age: Optional[int] = None
+    age: int | None = None
     # parent:tuple["People", "People"]
-    pets: List[str] = field(default_factory=list)
-    tools: Dict[str,int] =  field(default_factory=dict)
-
+    pets: list[str] = field(default_factory=list)
+    tools: dict[str,int] =  field(default_factory=dict)
+    pair: tuple[int, str] = (0, "0")
 
 @dataclass(kw_only=True, frozen=True)
 class Department:
     name: str
-    manager: Optional[People] = None
-    employee: List[People] = field(default_factory=list)
-    position: Dict[int, People] = field(default_factory=dict)
+    manager: People | None = None
+    employee: list[People] = field(default_factory=list)
+    position: dict[int, People] = field(default_factory=dict)
+
 
 def test_to_kwargs():
     addon = {
@@ -52,7 +53,8 @@ def test_to_kwargs():
         "pet1" : "dog",
         "pet2" : "cat",
         "title" : "Worker,2",
-        "tools" : {"pen": 1}
+        "tools" : {"pen": 1},
+        "test" : (1, "3")
     }
 
     # table 的结构
@@ -64,7 +66,8 @@ def test_to_kwargs():
                  (("pet1","pet2"), "pets", lambda p1,p2: [p1,p2]),
                  ("title", ("title", "level"),
                   (None, lambda title: int(title.split(',')[-1])) # converter 为 None 表示直接转换
-                  )
+                  ),
+                 ("test", "pair")
                  ]
 
     assert to_kwargs(People, addon, map_table) == {
@@ -73,7 +76,8 @@ def test_to_kwargs():
         "level" : 2,
         "age" : 30,
         "pets" : ["dog", "cat"],
-        "tools" : {"pen": 1}
+        "tools" : {"pen": 1},
+        "pair" : (1, "3")
     }
 
     # 如果已经在 map_table 定义过的 key ，不会再自动赋值到同名字段
@@ -268,7 +272,8 @@ def test_create():
         "level" : -1,
         "age" : 20,
         "pets" : ["dog"],
-        "tools" : {"pen": 1}
+        "tools" : {"pen": 1},
+        "pair" : (1, "1")
     }
 
     assert create(People, kwargs_).__dict__ == kwargs_

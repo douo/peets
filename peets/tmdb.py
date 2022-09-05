@@ -33,8 +33,6 @@ def search(movie: Movie):
         year = movie.year,
     )
     results = api.results
-    for s in results:
-         print(s['title'], s['id'], s['release_date'], s['popularity'])
     return results
 
 def _credits_filter(person_type: PersonType):

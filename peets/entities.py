@@ -3,6 +3,9 @@ from uuid import UUID, uuid4
 from datetime import date
 from enum import Enum, auto
 
+from pathlib import Path
+
+
 class CountryCode(Enum):
     """ISO_3166-1 derive from
 
@@ -480,8 +483,8 @@ class MediaArtwork:
 @dataclass(kw_only=True)
 class MediaEntity:
     dbid: UUID = uuid4()
-    locked: bool = False
-    data_source: str = ""
+    locked: bool = False # ignore
+    data_source: str = ""  #TODO 暂时没有 data_source 的概念，可以存放首次发现的目录？
     ids: dict[str, str] = field(default_factory=dict)
     title: str = ""
     original_title: str = ""
@@ -492,8 +495,8 @@ class MediaEntity:
     production_company: str = ""
     scraped: bool = False
     note: str = ""
-    ratings: dict[str,MediaRating] = field(default_factory=dict)
-    media_files: list[str] = field(default_factory=list)
+    ratings: dict[str, MediaRating] = field(default_factory=dict)
+    media_files: list[tuple[MediaFileType, Path]] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
     artwork_url_map: dict[MediaFileType, str] = field(default_factory=dict)
     original_filename: str = ""
@@ -505,12 +508,12 @@ class MediaEntity:
 
 @dataclass
 class MediaTrailer:
-    name:str = ""
-    url:str = ""
-    quality:str = ""
-    provider:str = ""
-    in_nfo:bool = False
-    date:str = ""
+    name: str = ""
+    url: str = ""
+    quality: str = ""
+    provider: str = ""
+    in_nfo: bool = False
+    date: str = ""
 
 
 class PersonType(Enum):
@@ -552,13 +555,13 @@ class Movie(MediaEntity):
     release_date:str = ""
     multi_movie_dir:bool = False # 目录内是否有多个视频文件
     top250:int = 0
-    media_source:str = ""  #TODO see guessit.rules.properties.source
-    video_in_3d:bool = False
-    certification:MediaCertification = MediaCertification.UNKNOWN
-    movie_set_id:UUID | None = None
-    edition:str = ""  # TODO see guessit.rules.properties.edition
-    stacked:bool = False
-    offline:bool = False
+    media_source: str = ""  #TODO see guessit.rules.properties.source
+    video_in_3d: bool = False
+    certification: MediaCertification = MediaCertification.UNKNOWN
+    movie_set_id: UUID | None = None
+    edition: str = ""  # TODO see guessit.rules.properties.edition
+    stacked: bool = False
+    offline: bool = False
     genres:list[MediaGenres] = field(default_factory=list)
     extra_thumbs:list[str] = field(default_factory=list)
     extra_fanarts:list[str] =  field(default_factory=list)
