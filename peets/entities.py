@@ -399,7 +399,8 @@ class MediaFileType(Enum):
   DOUBLE_EXT = auto() #  the filename startsWith video filename (and added extension) = auto()so we keep them...
   UNKNOWN = auto()
 
-  def graph_type(self) -> list['MediaFileType']:
+  @staticmethod
+  def graph_type() -> list['MediaFileType']:
       return [
             MediaFileType.BANNER,
             MediaFileType.CHARACTERART,
@@ -416,7 +417,7 @@ class MediaFileType(Enum):
         ]
 
   def is_graph(self) -> bool:
-      return self in self.graph_type()
+      return self in MediaFileType.graph_type()
 
 
 @dataclass

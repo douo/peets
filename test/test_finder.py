@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from peets.finder import traverse, MOVIE_CONTAINERS
+from peets.finder import traverse
+from peets.const import VIDEO_CONTAINERS
 
 def _create_file(name:str, parent:Path):
     f = parent.joinpath(name)
@@ -14,7 +15,7 @@ def test_traverse_single_file(tmp_path:Path):
     """
     # 创建 10 个媒体文件
     files = [_create_file(f"test.{suf}", tmp_path)
-        for suf in MOVIE_CONTAINERS[1:10]
+        for suf in VIDEO_CONTAINERS[1:10]
      ]
 
     # 单个文件
@@ -33,7 +34,7 @@ def test_traverse_folder(tmp_path):
     """
     # 创建 10 个媒体文件
     files = [_create_file(f"test.{suf}", tmp_path)
-        for suf in MOVIE_CONTAINERS[1:10]
+        for suf in VIDEO_CONTAINERS[1:10]
      ]
 
     # 目录内多个文件
@@ -57,12 +58,12 @@ def test_traverse_mixed(tmp_path):
     # 创建 10 个媒体文件
     p1 = tmp_path.joinpath("1")
     files_1 = [_create_file(f"test.{suf}", p1)
-        for suf in MOVIE_CONTAINERS[1:10]
+        for suf in VIDEO_CONTAINERS[1:10]
      ]
 
     p2 = tmp_path.joinpath("2")
     files_2 = [_create_file(f"test.{suf}", p2)
-        for suf in MOVIE_CONTAINERS[1:10]
+        for suf in VIDEO_CONTAINERS[1:10]
      ]
 
     # 多个目录内文件
@@ -71,7 +72,7 @@ def test_traverse_mixed(tmp_path):
 
     # 混合目录及文件
     files = [_create_file(f"test.{suf}", tmp_path)
-        for suf in MOVIE_CONTAINERS[1:10]
+        for suf in VIDEO_CONTAINERS[1:10]
      ]
 
     res = traverse(p1,p2,*files)
@@ -82,7 +83,7 @@ def test_traverse_hidden_file(tmp_path:Path):
     """
     能识别显示指定的隐藏文件
     """
-    hidden = _create_file(f".test.{MOVIE_CONTAINERS[-1]}", tmp_path)
+    hidden = _create_file(f".test.{VIDEO_CONTAINERS[-1]}", tmp_path)
 
     res = list(traverse(hidden))[0]
     assert res == hidden
@@ -91,7 +92,7 @@ def test_traverse_hidden_file_inside_folder(tmp_path:Path):
     """
     目录中的隐藏文件不被识别
     """
-    hidden = _create_file(f".test.{MOVIE_CONTAINERS[-1]}", tmp_path)
+    hidden = _create_file(f".test.{VIDEO_CONTAINERS[-1]}", tmp_path)
     res = traverse(tmp_path)
     assert not any(res)
 
@@ -100,7 +101,7 @@ def test_traverse_file_inside_hidden_folder(tmp_path:Path):
     """
     隐藏目录中的文件不被识别
     """
-    hidden = _create_file(f"test.{MOVIE_CONTAINERS[-1]}", tmp_path.joinpath(".hidden"))
+    hidden = _create_file(f"test.{VIDEO_CONTAINERS[-1]}", tmp_path.joinpath(".hidden"))
     res = traverse(tmp_path)
     assert not any(res)
 
@@ -111,11 +112,11 @@ def test_traverse_duplicate_path(tmp_path:Path):
     """
     p1 = tmp_path.joinpath("1")
     files_1 = [_create_file(f"test.{suf}", p1)
-        for suf in MOVIE_CONTAINERS[1:10]
+        for suf in VIDEO_CONTAINERS[1:10]
      ]
 
     files = [_create_file(f"test.{suf}", tmp_path)
-        for suf in MOVIE_CONTAINERS[1:10]
+        for suf in VIDEO_CONTAINERS[1:10]
      ]
 
     res = list(traverse(tmp_path, p1))

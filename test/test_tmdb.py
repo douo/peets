@@ -1,5 +1,5 @@
 from peets.tmdb import fill
-from peets.nfo import write_nfo
+from peets.nfo import generate_nfo
 from peets.entities import Movie
 import os
 import json
@@ -20,7 +20,7 @@ def test_fill(datadir, mocker):
     m.ids["imdb"] =  data["imdb_id"]
     m.ids["tmdb"] = data["id"]
 
-    xml = write_nfo(m)
+    xml = generate_nfo
     print(xml)
 
 @fixture

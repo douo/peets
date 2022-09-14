@@ -5,7 +5,7 @@ from peets.entities import MediaFileType, Movie
 from peets.guessit import NonMedia, create_entity
 from guessit import guessit
 
-from .util import create_file
+from util import create_file
 
 
 def test_create_entity_with_movie(tmp_path):
