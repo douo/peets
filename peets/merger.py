@@ -8,8 +8,6 @@ from attr import attrib
 from peets.entities import MediaEntity
 from abc import ABCMeta, abstractmethod
 
-
-
 class TypeNotMatchError(Exception):
     pass
 

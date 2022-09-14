@@ -399,6 +399,26 @@ class MediaFileType(Enum):
   DOUBLE_EXT = auto() #  the filename startsWith video filename (and added extension) = auto()so we keep them...
   UNKNOWN = auto()
 
+  def graph_type(self) -> list['MediaFileType']:
+      return [
+            MediaFileType.BANNER,
+            MediaFileType.CHARACTERART,
+            MediaFileType.CLEARART,
+            MediaFileType.CLEARLOGO,
+            MediaFileType.DISC,
+            MediaFileType.EXTRAFANART,
+            MediaFileType.FANART,
+            MediaFileType.EXTRATHUMB,
+            MediaFileType.KEYART,
+            MediaFileType.LOGO,
+            MediaFileType.POSTER,
+            MediaFileType.THUMB
+        ]
+
+  def is_graph(self) -> bool:
+      return self in self.graph_type()
+
+
 @dataclass
 class MediaRating:
     rating_id: str = ""
@@ -504,6 +524,15 @@ class MediaEntity:
     last_scrape_language: str = ""
     newly_added: bool = False
     duplicate: bool = False
+    # custom
+    screen_size: str = ""
+    audio_codec: str = ""
+
+    def main_video(self) -> Path:
+        return next(p for t,p in self.media_files if t is MediaFileType.VIDEO)
+
+    def has_media_file(self, type_: MediaFileType) ->  bool:
+        return any(t for t,p in self.media_files if t is type_)
 
 
 @dataclass

@@ -43,10 +43,11 @@ class _TittleSplitRule(CustomRule):
     def then(self, matches, when_response, context):
         title, m = when_response
         _start = title.start
-        _end = m.end()+1
-        # title.start = _end
-        title.value = title.value[_end:]
-        matches.append(Match(_start, _end - 1, name='cjk_title', value=m.group()))
+        _end = title.end
+        origin = title.value[m.end()+1:]
+        title.end = m.end()
+        title.value = m.group()
+        matches.append(Match(m.end()+1, _end, name='original_title', value=origin))
 
 
 # FIXME multiple file movie
@@ -93,21 +94,7 @@ def parse_mediafile_type(path: Path) -> MediaFileType:
     if is_subtitle(path):
         return MediaFileType.SUBTITLE
     if is_artwork_file(path):
-        artwork_type = [
-            MediaFileType.BANNER,
-            MediaFileType.CHARACTERART,
-            MediaFileType.CLEARART,
-            MediaFileType.CLEARLOGO,
-            MediaFileType.DISC,
-            MediaFileType.EXTRAFANART,
-            MediaFileType.FANART,
-            MediaFileType.EXTRATHUMB,
-            MediaFileType.KEYART,
-            MediaFileType.LOGO,
-            MediaFileType.POSTER,
-            MediaFileType.THUMB
-        ]
-        for t in artwork_type:
+        for t in MediaFileType.graph_type():
             if t.name.lower() in path.stem.lower():
                 return t
     if "nfo" == path.suffix[1:]:
@@ -128,5 +115,6 @@ def _create_movie(guess: dict, path: Path) -> Movie: # type: ignore
 
     mfs.append((MediaFileType.VIDEO, path))
     guess["media_files"] = mfs
+    guess['original_filename'] = path.name
 
     return create(Movie, guess)

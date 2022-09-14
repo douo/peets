@@ -108,7 +108,7 @@ def _process(item: NfoTableItem, root: ET.Element, movie: Movie):
         case conv:
             (cast(Callable, conv))(root, movie)
 
-def write_nfo(movie: Movie):
+def generate_nfo(movie: Movie) -> str:
     root = ET.Element("movie")
     root.addprevious(ET.Comment(f"created on {datetime.now().isoformat()}"))
     doc = ET.ElementTree(root)
