@@ -2,6 +2,8 @@ from shutil import move
 from peets.naming import do_copy
 from util import create_file
 from peets.entities import MediaFileType, Movie
+import stat
+
 def test_do_copy_simple_naming(tmp_path):
     media_files = [
         (MediaFileType.VIDEO, "中文名.English.Name.2021.UHD.BluRay.2160p.x265.10bit.HDR.mUHD-FRDS.mkv"),
@@ -28,6 +30,8 @@ def test_do_copy_simple_naming(tmp_path):
                                                                              "movie.nfo",
                                                                              "poster.jpg",
                                                                              "banner.jpg"])
+
+    assert stat.S_IMODE(parent.joinpath("movie.nfo").stat().st_mode) is 0o755
 
 def test_do_copy(tmp_path):
     media_files = [
