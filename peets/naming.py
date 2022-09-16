@@ -1,5 +1,7 @@
 from pathlib import Path
 from shutil import copy
+from os import chmod
+import stat
 from reflink import reflink, supported_at
 from peets.entities import MediaEntity, MediaFileType
 
@@ -52,6 +54,7 @@ def do_copy(media: MediaEntity, lib_path: Path, simple=True):
     else:
         copy(main_video_path, new_path)
 
+    mod = stat.S_IMODE(new_path.stat().st_mode)
     # other media file
     for t, p  in media.media_files:
         media_file_selected = media_file_simple if simple else  media_file
@@ -59,3 +62,5 @@ def do_copy(media: MediaEntity, lib_path: Path, simple=True):
             n = parent.joinpath(f"{media_file_selected(media, t, p)}{p.suffix}")
             print(f"copy {str(p)} to {str(n)}")
             copy(p, n)
+            # 与主视频文件的权限保持一致
+            chmod(n, mod)

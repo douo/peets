@@ -1,4 +1,5 @@
 from shutil import move
+from os import chmod
 from peets.naming import do_copy
 from util import create_file
 from peets.entities import MediaFileType, Movie
@@ -11,12 +12,16 @@ def test_do_copy_simple_naming(tmp_path):
         (MediaFileType.BANNER, "中文名.English.Name.2021.UHD.BluRay.2160p.x265.10bit.HDR.mUHD-FRDS-banner.jpg"),
         (MediaFileType.POSTER, "中文名.English.Name.2021.UHD.BluRay.2160p.x265.10bit.HDR.mUHD-FRDS-poster.jpg")
     ]
+    media_files=[(t, create_file(n, tmp_path, tmp_path.joinpath("src"))) for t, n in media_files]
+    main_video = media_files[0][1]
+    chmod(main_video, 0o754)
+
     movie = Movie(
-        title="Title",
-        year=2022,
-        audio_codec="AAC",
-        screen_size="2160p",
-        media_files=[(t, create_file(n, tmp_path, tmp_path.joinpath("src"))) for t, n in media_files]
+        title = "Title",
+        year = 2022,
+        audio_codec = "AAC",
+        screen_size = "2160p",
+        media_files = media_files
     )
 
     lib_path = tmp_path.joinpath("dst")
@@ -31,7 +36,8 @@ def test_do_copy_simple_naming(tmp_path):
                                                                              "poster.jpg",
                                                                              "banner.jpg"])
 
-    assert stat.S_IMODE(parent.joinpath("movie.nfo").stat().st_mode) is 0o755
+    assert (stat.S_IMODE(parent.joinpath("movie.nfo").stat().st_mode)
+            == stat.S_IMODE(main_video.stat().st_mode))
 
 def test_do_copy(tmp_path):
     media_files = [
