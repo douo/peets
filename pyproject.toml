@@ -13,7 +13,8 @@ dependencies = [
     "tmdbsimple == 2.9.1",
     "reflink == 0.2.1",
     "guessit",
-    "teletype"
+    "teletype",
+    "python-dateutil"
 ]
 
 [project.optional-dependencies]

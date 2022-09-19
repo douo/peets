@@ -6,7 +6,7 @@ from typing import Callable, Tuple, Any, cast
 from lxml import etree as ET
 from datetime import datetime
 
-from peets.entities import Movie, MediaFileType, MediaRating
+from peets.entities import MediaArtwork, Movie, MediaFileType, MediaArtworkType, MediaRating
 
 
 def _uniqueid(root: ET.Element, movie: Movie):
@@ -136,9 +136,9 @@ def generate_nfo(movie: Movie) -> str:
         ("fanart", "artwork_url_map",
          lambda artwork_url_map: artwork_url_map.get(MediaFileType.FANART)),
         ("mpaa", "certification",
-         lambda certification: ""), # TODO CertificationStyle.formatCertification
+         lambda certification: certification.mmpa()),
         ("certification", "certification",
-         lambda certification: ""), # TODO same as mapp
+         lambda certification: certification.certification),
         ("id", "ids",
          lambda ids: ids["imdb"]),
         ("tmdbid", "ids",

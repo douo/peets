@@ -1,12 +1,13 @@
-from peets.tmdb import fill
+from peets.tmdb import TmdbMovieMetadata, TmdbArtworkProvider
 from peets.nfo import generate_nfo
-from peets.entities import Movie
+from peets.entities import MediaFileType, Movie, MediaCertification
+from peets.iso import Language, Country
 import os
 import json
 from distutils import dir_util
 from pytest import fixture
 
-def test_fill(datadir, mocker):
+def test_detail(datadir, mocker):
     with open(f"{datadir}/movie.json") as f:
         data = json.load(f)
 
@@ -15,13 +16,36 @@ def test_fill(datadir, mocker):
         return_value=data
     )
 
-    m = fill(Movie(), 0)
+    tmdb = TmdbMovieMetadata(language=Language.ZH,
+                             country=Country.CN)
+    m = tmdb.apply(Movie(), id_=0)
 
-    m.ids["imdb"] =  data["imdb_id"]
-    m.ids["tmdb"] = data["id"]
+    assert m.ids["imdb"] ==  data["imdb_id"]
+    assert int(m.ids["tmdb"]) == data["id"]
+    assert m.release_date == "2022-07-08"
+    assert m.certification == MediaCertification.US_PG13
 
-    xml = generate_nfo
-    print(xml)
+    # print(generate_nfo(m))
+
+def test_artwork(datadir, mocker):
+    with open(f"{datadir}/movie_images.json") as f:
+        data = json.load(f)
+
+    mocker.patch(
+        "tmdbsimple.Movies._GET",
+        return_value=data
+    )
+    tmdb = TmdbArtworkProvider(language=Language.ZH,
+                             country=Country.CN)
+
+    m = tmdb.apply(Movie(ids={"tmdb": 0}))
+
+    assert m.artwork_url_map == {
+        MediaFileType.POSTER: "https://image.tmdb.org/t/p/original/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg",
+        MediaFileType.FANART: "https://image.tmdb.org/t/p/original/5pxdgKVEDWDQBtvqIB2eB2oheml.jpg"
+    }
+    print(m)
+
 
 @fixture
 def datadir(tmpdir, request):

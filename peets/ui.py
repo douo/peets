@@ -12,11 +12,12 @@ from typing_inspect import TypeVar
 
 from peets.entities import MediaArtworkType, MediaEntity, MediaFileType
 from peets.merger import replace
-from peets.tmdb import search, fill
 from peets.nfo  import generate_nfo
 import peets.naming as naming
 
 import pprint
+
+from peets.scraper import artwork, metadata
 pp = pprint.PrettyPrinter(indent=2)
 
 @dataclass
@@ -86,11 +87,15 @@ def brief(media: MediaEntity):
 
 def do_fill(media: T) -> T:
     id_  = style_input("tmdb id:", style=["blue", "bold"])
-    return fill(media, int(id_))
+    scraper = metadata(media)
+    new_ = scraper.apply(media, id_ = int(id_))
+    scraper = artwork(media)
+    return scraper.apply(new_)
 
 def do_search(media: MediaEntity):
     print("Searching...")
-    result = search(media)
+    scraper = metadata(media)
+    result = scraper.search(media)
     if result:
         choices = [ChoiceHelper(
             s,
@@ -99,7 +104,9 @@ def do_search(media: MediaEntity):
         ) for s in result]
         pick =  SelectOne(choices).prompt()
         print("Fetching...")
-        return fill(media, pick["id"])
+        new_ =  scraper.apply(media, id_ = pick["id"])
+        scraper = artwork(media)
+        return scraper.apply(new_)
     else:
         print("Not Found!")
 
