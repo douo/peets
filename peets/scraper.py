@@ -30,7 +30,6 @@ class Provider(ABC, Generic[T]):
     def is_available(self, media: T) -> bool:
         return type(media).__name__.lower() in [t.lower() for t in self.available_type()]
 
-
 SearchResult: TypeAlias = dict
 class MetadataProvider(Provider[T], Generic[T]):
     @abstractmethod

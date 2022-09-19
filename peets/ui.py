@@ -29,11 +29,11 @@ class MediaVO:
 class Action(Enum):
     # NO_ACTION = 0
     NEXT = 1
-    QUIT = 2
+    QUIT = 3
 
 T = TypeVar("T", bound=MediaEntity)
 
-def interact(media: MediaEntity, lib_path: Path):
+def interact(media: MediaEntity, lib_path: Path, naming_style: str):
     brief(media)
     ops = {
         "lf": ("search", "enter", do_search),
@@ -41,7 +41,7 @@ def interact(media: MediaEntity, lib_path: Path):
         "n": ("edit name", "n", partial(modify,attr="title")),
         "y": ("edit year", "y", partial(modify, attr="year")),
         "d": ("detail", "d", lambda media: pp.pprint(media.__dict__)),
-        "p": ("process", "p", partial(do_process, lib_path=lib_path)),
+        "p": ("process", "p", partial(do_process, lib_path=lib_path, naming_style=naming_style)),
         "j": ("skip", "j", Action.NEXT)
     }
     hint = lambda : style_print(", ".join([f"{label} ({key})" for label, key, _ in ops.values()]),
@@ -113,7 +113,7 @@ def do_search(media: MediaEntity):
 
 import tempfile
 
-def do_process(media: MediaEntity, lib_path: Path):
+def do_process(media: MediaEntity, lib_path: Path, naming_style: str):
     # fetch online media file
     parsed: tuple[MediaFileType, Path] = [(t, _make_sure_media_file(t, uri)) for t, uri in media.artwork_url_map.items() if not media.has_media_file(t)]
 
@@ -126,7 +126,7 @@ def do_process(media: MediaEntity, lib_path: Path):
         parsed.append((MediaFileType.NFO, Path(f.name)))
     media = data_replace(media, media_files=media.media_files + parsed)
     brief(media)
-    naming.do_copy(media, lib_path)
+    naming.do_copy(media, lib_path, naming_style)
     return Action.NEXT
 
 def _make_sure_media_file(type_: MediaFileType, uri: str | Path) ->  Path:

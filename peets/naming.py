@@ -36,7 +36,8 @@ def media_file(media: MediaEntity, type_: MediaFileType, path: Path) -> str:
         return type_.name.lower() # FIXME
 
 
-def do_copy(media: MediaEntity, lib_path: Path, simple=True):
+def do_copy(media: MediaEntity, lib_path: Path, naming_style="simple"):
+    simple = "simple" == naming_style
     # create folder
     parent = lib_path.joinpath(type_(media), folder(media))
     parent.mkdir(parents=True)

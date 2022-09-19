@@ -16,6 +16,7 @@ def main():
                         type=Path,
                         default=getcwd(),
                         help="specify the library location, default is `cwd`")
+    parser.add_argument('--naming', choices=["simple, full"], default="simple")
     parser.add_argument('targets', type=Path, nargs='+')
     args = parser.parse_args()
     media_files = traverse(*args.targets)
@@ -25,7 +26,7 @@ def main():
                                  if isinstance(e, Movie))
 
     for m in movie_set:
-        if interact(m, args.library) is Action.QUIT:
+        if interact(m, args.library, args.naming) is Action.QUIT:
             return
 
 
