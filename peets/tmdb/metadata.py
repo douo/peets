@@ -4,7 +4,7 @@ from datetime import datetime
 from dateutil.parser import isoparse
 from typing_extensions import TypeAlias
 from tmdbsimple.movies import Movies
-from peets.entities import MediaCertification, MediaEntity, Movie, MediaFileType, MediaRating, MediaGenres, MediaArtwork, MediaArtworkType, Person, PersonType
+from peets.entities import MediaCertification, MediaEntity, Movie, MediaFileType, MediaRating, MediaGenres, MediaArtwork, MediaArtworkType, MovieSet, Person, PersonType
 from peets.merger import replace
 from peets.iso import Language, Country
 from peets.scraper import Feature, MetadataProvider, Provider, SearchResult
@@ -83,7 +83,7 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
             #genres
             ("genres", "genres", lambda genres: [_to_genre(g) for g in genres]),
             ("adult", "genres", lambda adult: MediaGenres.EROTIC if adult else []),
-            #TODO belongs_to_collections
+            ("belongs_to_collection", "movie_set", lambda data: MovieSet(name = data["name"], tmdb_id = data["id"]) if data else None),
             ("keywords", "tags", lambda keywords: [k["name"] for k in keywords["keywords"]])
         ]
 

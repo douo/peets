@@ -529,11 +529,10 @@ class Person:
 
 
 @dataclass(kw_only=True)
-class MovieSet(MediaEntity):
-    movie_ids:list[UUID] = field(default_factory=list)
-    movies:list["Movie"] = field(default_factory=list)
-    title_sortable:str = ""
-
+class MovieSet:
+    name: str = ""
+    overview: str = ""
+    tmdb_id: int = 0
 
 
 @dataclass(kw_only=True)
@@ -552,7 +551,6 @@ class Movie(MediaEntity):
     media_source: str = ""  #TODO see guessit.rules.properties.source
     video_in_3d: bool = False
     certification: MediaCertification = MediaCertification.UNKNOWN
-    movie_set_id: UUID | None = None
     edition: str = ""  # TODO see guessit.rules.properties.edition
     stacked: bool = False
     offline: bool = False

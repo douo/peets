@@ -75,6 +75,17 @@ def _actors(ele: str, attr: str) -> Callable[[ET.Element, Movie], None]:
 
     return _inner
 
+def _set(root, movie: Movie):
+    if ms := movie.movie_set:
+        set = ET.SubElement(root, "set")
+        name = ET.SubElement(set, "name")
+        name.text = ms.name
+        overview = ET.SubElement(set, "overview")
+        overview.text = ms.overview
+        collectionId = ET.SubElement(root, "tmdbCollectionId")
+        collectionId.text = str(ms.tmdb_id)
+
+
 def _showlinks(root, movie: Movie):
     for link in movie.showlinks:
         child = ET.SubElement(root, "showlink")
@@ -125,8 +136,7 @@ def generate_nfo(movie: Movie) -> str:
          lambda ratings: ""), # TODO userrating
         ("votes", "ratings",
          lambda ratings: str(ratings["tmdb"].votes)), # FIXME
-        ("set", "movie_set",
-         lambda movie_set: movie_set.title if movie_set else ""),
+        _set, # movie_set
         "plot",
         ("outline", "plot"), # FIXME use whole plot
         "tagline",

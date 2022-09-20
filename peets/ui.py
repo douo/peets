@@ -121,7 +121,7 @@ def do_process(media: MediaEntity, lib_path: Path, naming_style: str):
         with tempfile.NamedTemporaryFile(suffix=".nfo", delete=False) as f:
             nfo = generate_nfo(media)
             f.write(nfo)
-            print("parsing nfo to {f.name}")
+            print(f"parsing nfo to {f.name}")
 
         parsed.append((MediaFileType.NFO, Path(f.name)))
     media = data_replace(media, media_files=media.media_files + parsed)

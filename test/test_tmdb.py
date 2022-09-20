@@ -1,6 +1,6 @@
 from peets.tmdb import TmdbMovieMetadata, TmdbArtworkProvider
 from peets.nfo import generate_nfo
-from peets.entities import MediaFileType, Movie, MediaCertification
+from peets.entities import MediaFileType, Movie, MediaCertification, MovieSet
 from peets.iso import Language, Country
 import os
 import json
@@ -24,8 +24,8 @@ def test_detail(datadir, mocker):
     assert int(m.ids["tmdb"]) == data["id"]
     assert m.release_date == "2022-07-08"
     assert m.certification == MediaCertification.US_PG13
-
-    # print(generate_nfo(m))
+    assert m.movie_set.tmdb_id == 131296
+    print(generate_nfo(m))
 
 def test_artwork(datadir, mocker):
     with open(f"{datadir}/movie_images.json") as f:
@@ -44,7 +44,9 @@ def test_artwork(datadir, mocker):
         MediaFileType.POSTER: "https://image.tmdb.org/t/p/original/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg",
         MediaFileType.FANART: "https://image.tmdb.org/t/p/original/5pxdgKVEDWDQBtvqIB2eB2oheml.jpg"
     }
-    print(m)
+
+
+    # print(m)
 
 
 @fixture
