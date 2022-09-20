@@ -19,7 +19,7 @@ class MediaCertification(Enum):
         self.certification = certification
         self.possible_notations = possible_notations
 
-    def mmpa(self) -> str:
+    def mpaa(self) -> str:
         match self:
             case MediaCertification.US_G:
                 return "Rated G";

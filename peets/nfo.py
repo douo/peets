@@ -99,6 +99,9 @@ NfoTableItem = (str | # direct map
                 Callable[[ET.Element, Movie], None]) # most flexible FIXME
 NfoTable = list[NfoTableItem]
 
+def _str(value) -> str:
+    return str(value).lower() if isinstance(value, bool) else str(value)
+
 def _process(item: NfoTableItem, root: ET.Element, movie: Movie):
     """
     FIXME match...case is not suit for this?
@@ -106,16 +109,16 @@ def _process(item: NfoTableItem, root: ET.Element, movie: Movie):
     match item:
         case str() as tag:
             child = ET.SubElement(root, tag)
-            child.text = str(getattr(movie, tag))
+            child.text =  _str(getattr(movie, tag))
         case (str() as tag, str() as field):
             child = ET.SubElement(root, tag)
-            child.text = str(getattr(movie, field))
+            child.text = _str(getattr(movie, field))
         case (str() as tag, str() as field,  conv):
             child = ET.SubElement(root, tag)
-            child.text = str((cast(Callable, conv))(getattr(movie, field)))
+            child.text = _str((cast(Callable, conv))(getattr(movie, field)))
         case (str() as tag, conv):
             child = ET.SubElement(root, tag)
-            child.text = str((cast(Callable, conv))(movie))
+            child.text = _str((cast(Callable, conv))(movie))
         case conv:
             (cast(Callable, conv))(root, movie)
 
@@ -146,7 +149,7 @@ def generate_nfo(movie: Movie) -> str:
         ("fanart", "artwork_url_map",
          lambda artwork_url_map: artwork_url_map.get(MediaFileType.FANART)),
         ("mpaa", "certification",
-         lambda certification: certification.mmpa()),
+         lambda certification: certification.mpaa()),
         ("certification", "certification",
          lambda certification: certification.certification),
         ("id", "ids",

@@ -75,73 +75,72 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
             # 一对多的情况下，支持通过 tuple 指定
             # 转换函数表示默认赋值
             ("release_date", "year", lambda release_date: datetime.strptime(release_date, "%Y-%m-%d").year),
-            ("release_dates", "release_date", lambda release_dates: self._parse_release_date(release_dates)),
-            ("release_dates", "certification", lambda release_dates: self._parse_certification(release_dates)),
+            (("release_dates", "production_countries"), "release_date", lambda release_dates, production_countries: self._parse_release_date(release_dates, production_countries)),
+            (("release_dates", "production_countries"), "certification", lambda release_dates, production_countries: self._parse_certification(release_dates, production_countries)),
             #credits TODO partition
             ("credits", ("actors", "producers", "directors", "writers"),
              (_credits_filter(PersonType.ACTOR), _credits_filter(PersonType.PRODUCER), _credits_filter(PersonType.DIRECTOR), _credits_filter(PersonType.WRITER))),
             #genres
             ("genres", "genres", lambda genres: [_to_genre(g) for g in genres]),
             ("adult", "genres", lambda adult: MediaGenres.EROTIC if adult else []),
-            ("belongs_to_collection", "movie_set", lambda data: MovieSet(name = data["name"], tmdb_id = data["id"]) if data else None),
+            ("belongs_to_collection", ("movie_set", "ids"),
+             ((lambda data: MovieSet(name = data["name"], tmdb_id = data["id"]) if data else None),
+             (lambda data: ("tmdbSet", str(data["id"]))))
+             ),
             ("keywords", "tags", lambda keywords: [k["name"] for k in keywords["keywords"]])
         ]
 
         return replace(movie, context, table)
 
+    # 按本地化、US、原始发行国的顺序取值
+    def _parse_release_date(self, release_dates, production_countries) -> str:
+        countries = [self.country, self.fallback_country]
+        countries += [v["iso_3166_1"] for v in production_countries if v["iso_3166_1"] not in countries]
+        data = _find_release_dates(release_dates, countries)
 
-    def _find_release_dates(self, release_dates):
-        fallback = None
-        target = None
-        release_dates = release_dates["results"]
-        for data in release_dates:
-            if data["iso_3166_1"] == self.country:
-                target = data
-            elif data["iso_3166_1"] == self.fallback_country:
-                fallback = data
-            if target and fallback:
+        for c in countries:
+            if c in data:
+                items = data[c]
+                for item in items:
+                    if v:= item["release_date"]:
+                        return isoparse(v).strftime("%Y-%m-%d")
+
+        return ""
+
+
+    # 按本地化、US、原始发行国的顺序取值
+    def _parse_certification(self, release_dates, production_countries) -> MediaCertification:
+        countries = [self.country, self.fallback_country]
+        countries += [v["iso_3166_1"] for v in production_countries if v["iso_3166_1"] not in countries]
+        data = _find_release_dates(release_dates, countries)
+
+        for c in countries:
+            if c in data:
+                items = data[c]
+                for item in items:
+                    if cert:= item["certification"]:
+                        try:
+                            return next(v for _, v in MediaCertification.__members__.items()
+                                          if v.country and v.country.name.lower() == c.lower() and cert in v.possible_notations
+                                          )
+                        except StopIteration:
+                            pass
+
+
+        return MediaCertification.UNKNOWN
+
+
+def _find_release_dates(release_dates, countries):
+    result = {}
+    release_dates = release_dates["results"]
+    for data in release_dates:
+        if (c:= data["iso_3166_1"]) in countries:
+            result[c] = data['release_dates']
+            if len(result) == len(countries):
                 break
 
-        return fallback,target
+    return result
 
-    def _parse_release_date(self, release_dates) -> str:
-        fallback, data = self._find_release_dates(release_dates)
-        result = None
-        if data:
-            data = data["release_dates"][0]
-            if data:
-                result =  isoparse(data["release_date"]).strftime("%Y-%m-%d")
-        if not result and fallback:
-            # breakpoint()
-            data = fallback["release_dates"][0]
-            if data:
-                result =  isoparse(data["release_date"]).strftime("%Y-%m-%d")
-        return result or ""
-
-
-    def _parse_certification(self, release_dates) -> MediaCertification:
-        fallback, data = self._find_release_dates(release_dates)
-        result = None
-        if data:
-            country = data["iso_3166_1"]
-            cert = data["release_dates"][0]["certification"]
-            try:
-                result = next(v for _, v in MediaCertification.__members__.items()
-                              if v.country and v.country.name == country and cert in v.possible_notations
-                              )
-            except StopIteration:
-                pass
-        if not result and fallback:
-            country = fallback["iso_3166_1"]
-            cert = fallback["release_dates"][0]["certification"]
-            try:
-                result = next(v for _, v in MediaCertification.__members__.items()
-                              if v.country and v.country.name == country and cert in v.possible_notations
-                              )
-            except StopIteration:
-                pass
-
-        return result or MediaCertification.UNKNOWN
 
 def _credits_filter(person_type: PersonType):
     if person_type is PersonType.ACTOR:

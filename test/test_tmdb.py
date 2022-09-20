@@ -25,7 +25,8 @@ def test_detail(datadir, mocker):
     assert m.release_date == "2022-07-08"
     assert m.certification == MediaCertification.US_PG13
     assert m.movie_set.tmdb_id == 131296
-    print(generate_nfo(m))
+    assert m.ids["tmdbSet"] == '131296'
+    # print(generate_nfo(m))
 
 def test_artwork(datadir, mocker):
     with open(f"{datadir}/movie_images.json") as f:
@@ -45,8 +46,35 @@ def test_artwork(datadir, mocker):
         MediaFileType.FANART: "https://image.tmdb.org/t/p/original/5pxdgKVEDWDQBtvqIB2eB2oheml.jpg"
     }
 
+def test_metadata_original_release_date_only(datadir, mocker):
+    with open(f"{datadir}/movie_original_release_date_only.json") as f:
+        data = json.load(f)
 
-    # print(m)
+    mocker.patch(
+        "tmdbsimple.Movies._GET",
+        return_value=data
+    )
+
+    tmdb = TmdbMovieMetadata(language=Language.ZH,
+                             country=Country.CN)
+    m = tmdb.apply(Movie(), id_=0)
+
+    assert m.release_date == "2022-07-08"
+
+def test_metadata_certification(datadir, mocker):
+    with open(f"{datadir}/movie_certification.json") as f:
+        data = json.load(f)
+
+    mocker.patch(
+        "tmdbsimple.Movies._GET",
+        return_value=data
+    )
+
+    tmdb = TmdbMovieMetadata(language=Language.ZH,
+                             country=Country.CN)
+    m = tmdb.apply(Movie(), id_=0)
+
+    assert m.certification == MediaCertification.US_PG13
 
 
 @fixture
