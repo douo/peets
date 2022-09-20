@@ -85,7 +85,7 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
             ("adult", "genres", lambda adult: MediaGenres.EROTIC if adult else []),
             ("belongs_to_collection", ("movie_set", "ids"),
              ((lambda data: MovieSet(name = data["name"], tmdb_id = data["id"]) if data else None),
-             (lambda data: ("tmdbSet", str(data["id"]))))
+             (lambda data: ("tmdbSet", str(data["id"])) if data else {}))
              ),
             ("keywords", "tags", lambda keywords: [k["name"] for k in keywords["keywords"]])
         ]

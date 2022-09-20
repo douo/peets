@@ -27,7 +27,7 @@ def test_do_copy_simple_naming(tmp_path):
     lib_path = tmp_path.joinpath("dst")
 
     # simple
-    do_copy(movie, lib_path, simple=True)
+    do_copy(movie, lib_path, naming_style="simple")
 
     parent = lib_path.joinpath("movie", "Title (2022)")
     assert parent.exists()
@@ -57,7 +57,7 @@ def test_do_copy(tmp_path):
     lib_path = tmp_path.joinpath("dst")
 
     # simple
-    do_copy(movie, lib_path, simple=False)
+    do_copy(movie, lib_path, naming_style="full")
 
     parent = lib_path.joinpath("movie", "Title (2022)")
     assert parent.exists()
