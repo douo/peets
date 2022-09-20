@@ -272,6 +272,10 @@ class MediaGenres(Enum):
 
     https://gitlab.com/tinyMediaManager/tinyMediaManager/-/blob/devel/src/main/java/org/tinymediamanager/core/entities/MediaGenres.java
     """
+
+    def text(self) -> str:
+        return self.name.title().replace("_", " ")
+
     ACTION = auto()
     ADVENTURE = auto()
     ANIMATION = auto()

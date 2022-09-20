@@ -27,7 +27,7 @@ def _country(root, movie: Movie):
 def _genre(root, movie: Movie):
     for g in movie.genres:
         child = ET.SubElement(root, "genre")
-        child.text = g.name # TODO LocalizedName
+        child.text = g.text() # TODO LocalizedName
 
 def _studio(root, movie: Movie):
     for c in movie.production_company.split(","):
