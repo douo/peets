@@ -1,16 +1,21 @@
 from pathlib import Path
-from guessit.api import GuessItApi, merge_options
+from dataclasses import replace
+
+from guessit.api import GuessItApi, guessit, merge_options
 from guessit.rules import rebulk_builder
 from guessit.rules.processors import Processors
+from guessit.rules.properties.audio_codec import audio_codec
 from guessit.rules.properties.crc import guess_idnumber
-from guessit.rules.properties.episode_title import POST_PROCESS, title_seps
+from guessit.rules.properties.episode_title import POST_PROCESS, episode_title, title_seps
 from rebulk import CustomRule
 from rebulk.match import Match
-from peets.entities import MediaFileType, Movie, MediaEntity
+from peets.entities import MediaFileType, Movie, MediaEntity, TvShow, TvShowEpisode, TvShowSeason
 from peets.error import UnknownMediaTypeError
-from peets.merger import create
+from peets.merger import MapTable, create
 from peets.finder import  is_artwork_file, is_subtitle, is_video
 from enum import Enum
+
+
 
 import os
 import regex
@@ -80,6 +85,8 @@ def create_entity(path: Path)-> MediaEntity | NonMedia:
             return NonMedia.SAMPLE
         case {"type": "movie"}:
             return _create_movie(guess, path)
+        case {"type": "episode"}:
+            return _create_tvshow(guess, path)
         case _:
             raise UnknownMediaTypeError(guess)
 
@@ -118,3 +125,31 @@ def _create_movie(guess: dict, path: Path) -> Movie: # type: ignore
     guess['original_filename'] = path.name
 
     return create(Movie, guess)
+
+def _create_tvshow(guess, path: Path) -> TvShow:
+    episode = guess
+    from pprint import pprint as pp
+    pp(guess)
+    tvshow = episode
+    season = episode
+
+    upper_1 = guessit(path.parent)
+    upper_2 = guessit(path.parent.parent)
+    if 'title' in upper_2 and upper_2['title'] == episode['title']:
+        tvshow = upper_2
+
+    if 'title' in upper_1 and upper_1['title'] == episode['title']:
+        if tvshow != upper_2:
+            tvshow = upper_1
+        season = upper_1
+
+    map_table = [("audio_codec", "audio_codec", lambda a: "&".join(a))]
+    tvshow = create(TvShow, tvshow, map_table)
+    episode = create(TvShowEpisode, episode, map_table)
+    season = TvShowSeason(tv_show=tvshow,
+                          season=episode.season,
+                          episodes=[episode])
+
+    tvshow = replace(tvshow, episodes=[episode], seasons=[season])
+
+    return tvshow

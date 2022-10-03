@@ -1,5 +1,5 @@
 from pathlib import Path
-from peets.entities import Movie
+from peets.entities import Movie, TvShow
 from peets.entities import MediaFileType, Movie
 
 from peets.guessit import NonMedia, create_entity
@@ -78,3 +78,11 @@ def test_create_entity_with_trailer(tmp_path):
 def test_create_entity_with_sample(tmp_path):
     f = create_file("Hight.Town.2020.AAC-HE_LC_8ch.sample.mkv", tmp_path)
     assert NonMedia.SAMPLE == create_entity(f)
+
+
+def test_create_tvshow(tmp_path):
+    f = create_file("Severance.S01E01.Good.News.About.Hell.REPACK.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES.mkv", tmp_path, parent="Severance.S01.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES")
+    m = create_entity(f)
+    from pprint import pprint as pp
+    pp(m)
+    assert isinstance(m, TvShow)

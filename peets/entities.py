@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
+from typing import TypeAlias
 from uuid import UUID, uuid4
 from datetime import date
 from enum import Enum, auto
@@ -388,6 +389,8 @@ class MediaFileType(Enum):
       return self in MediaFileType.graph_type()
 
 
+MediaFile: TypeAlias = tuple[MediaFileType, Path]
+
 @dataclass
 class MediaRating:
     rating_id: str = ""
@@ -485,7 +488,7 @@ class MediaEntity:
     scraped: bool = False
     note: str = ""
     ratings: dict[str, MediaRating] = field(default_factory=dict)
-    media_files: list[tuple[MediaFileType, Path]] = field(default_factory=list)
+    media_files: list[MediaFile] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
     artwork_url_map: dict[MediaFileType, str] = field(default_factory=dict)
     original_filename: str = ""
@@ -546,7 +549,7 @@ class Movie(MediaEntity):
     runtime:int = 0
     watched:bool = False
     playcount:int = 0
-    isDisc:bool = False
+    is_disc:bool = False
     spoken_languages:str = ""
     country:str = ""
     release_date:str = ""
@@ -571,5 +574,53 @@ class Movie(MediaEntity):
     title_sortable:str = ""
     original_title_sortable = ""
     other_ids = ""
-    late_watched:str = "" # date
     localized_spoken_languages:str = ""
+
+
+@dataclass(kw_only=True)
+class TvShow(MediaEntity):
+    sort_title: str = ""
+    certification: MediaCertification = MediaCertification.UNKNOWN
+    country: str = ""
+    genres: list[MediaGenres] = field(default_factory=list)
+    season_title_map: dict[int, str] = field(default_factory=dict)
+    season_poster_url_map: dict[int, str] = field(default_factory=dict)
+    season_fanart_url_map: dict[int, str] = field(default_factory=dict)
+    season_banner_url_map: dict[int, str] = field(default_factory=dict)
+    season_thumb_url_map: dict[int, str] = field(default_factory=dict)
+    actors: list[Person]  =  field(default_factory=list)
+    dummy_episodes: list[TvShowEpisode] = field(default_factory=list)
+    extra_fanart_urls: list[str] = field(default_factory=list)
+    trailer: list[MediaTrailer] = field(default_factory=list)
+    episodes: list[TvShowEpisode] = field(default_factory=list)
+    season_posters: dict[int, MediaFile] = field(default_factory=dict)
+    season_fanarts: dict[int, MediaFile] = field(default_factory=dict)
+    season_banners: dict[int, MediaFile] = field(default_factory=dict)
+    season_thumbs: dict[int, MediaFile] = field(default_factory=dict)
+    seasons: list[TvShowSeason] = field(default_factory=list)
+
+@dataclass(kw_only=True)
+class TvShowSeason:
+    tv_show: TvShow
+    season: int
+    episodes: list[TvShowEpisode] = field(default_factory=list)
+    title: str = ""
+
+@dataclass(kw_only=True)
+class TvShowEpisode(MediaEntity):
+    episode: int = -1
+    season: int = -1
+    dvd_season: int = -1
+    dvd_episode: int = -1
+    display_season: int = -1
+    display_episode: int = -1
+    first_aired: str = "" # date
+    is_disc: bool = False
+    multi_episode: bool = False
+    is_dvd_order: bool = False
+    stacked: bool = False  #TODO
+    actors: list[Person]  =  field(default_factory=list)
+    directors: list[Person]  =  field(default_factory=list)
+    writers: list[Person]  =  field(default_factory=list)
+    tv_show: TvShow | None = None
+    dummy: bool = False
