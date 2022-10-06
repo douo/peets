@@ -81,8 +81,21 @@ def test_create_entity_with_sample(tmp_path):
 
 
 def test_create_tvshow(tmp_path):
-    f = create_file("Severance.S01E01.Good.News.About.Hell.REPACK.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES.mkv", tmp_path, parent="Severance.S01.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES")
-    m = create_entity(f)
-    from pprint import pprint as pp
-    pp(m)
+    f1 = create_file("Severance.S01E01.Good.News.About.Hell.REPACK.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES.mkv", tmp_path, parent="Severance.S01.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES")
+    f2 = create_file("Severance.S01E02.Good.News.About.Hell.REPACK.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES.mkv", tmp_path, parent="Severance.S01.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES")
+    processed = set()
+    m = create_entity(f1, processed)
     assert isinstance(m, TvShow)
+    assert len(m.episodes) == 2
+    assert all((e.season == 1 for e in m.episodes))
+
+    # test processed
+    assert f1 in processed and f2 in processed
+    assert f1.parent in processed
+    m = create_entity(f1, processed)
+    assert m is NonMedia.PROCESSED
+
+    f3 = create_file("Severance.S01E03.Good.News.About.Hell.REPACK.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES.mkv", tmp_path, parent="Severance.S01.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES")
+    m = create_entity(f3, processed)
+    # tvshow 目录不会重复处理
+    assert m is NonMedia.PROCESSED

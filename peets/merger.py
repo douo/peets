@@ -1,6 +1,6 @@
 from sys import meta_path
 from types import NoneType, UnionType
-from typing import Generic, Protocol, Iterable, Sequence, Type, Any, TypeGuard, Union, Callable, get_type_hints, runtime_checkable, TypeVar, cast, TypeAlias
+from typing import Generic, Protocol, Iterable, Sequence, Tuple, Type, Any, TypeGuard, Union, Callable, get_type_hints, runtime_checkable, TypeVar, cast, TypeAlias
 from typing_inspect import get_args, get_origin, is_generic_type, is_tuple_type, is_union_type
 from itertools import chain
 from dataclasses import replace as data_replace
@@ -30,10 +30,11 @@ class Mergeable(Protocol, metaclass=ABCMeta):
 
 T = TypeVar('T')
 R = TypeVar('R')
-MapTableConverter: TypeAlias = None | Callable | tuple[Callable | None,...] | "MapTable"
+MapTableConverter: TypeAlias = Union[Callable, None, Tuple[Union[Callable, None],...], "MapTable"]
 MapTableItem: TypeAlias = (tuple[str | tuple[str,...], str | tuple[str,...], MapTableConverter ] |
                            tuple[str | tuple[str,...], str | tuple[str,...]])
 MapTable: TypeAlias = list[MapTableItem]
+
 
 StictMapTableItem = tuple[tuple[str,...], tuple[str,...], tuple[Callable | None,...]]
 StictMapTable: TypeAlias  = list[StictMapTableItem]

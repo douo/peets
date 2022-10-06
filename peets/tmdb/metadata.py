@@ -5,7 +5,7 @@ from dateutil.parser import isoparse
 from typing_extensions import TypeAlias
 from tmdbsimple.movies import Movies
 from peets.entities import MediaCertification, MediaEntity, Movie, MediaFileType, MediaRating, MediaGenres, MediaArtwork, MediaArtworkType, MovieSet, Person, PersonType
-from peets.merger import replace
+from peets.merger import MapTable, replace
 from peets.iso import Language, Country
 from peets.scraper import Feature, MetadataProvider, Provider, SearchResult
 import tmdbsimple as tmdb
@@ -47,7 +47,7 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
             append_to_response="credits,keywords,release_dates,translations"
         )
 
-        table = [
+        table: MapTable = [
             ("imdb_id","ids", lambda id_: ("imdb", str(id_))), # dict 类型的返回 (key value)
             ("id","ids", lambda id_: (PROVIDER_ID, str(id_))),
             ("overview", "plot"),

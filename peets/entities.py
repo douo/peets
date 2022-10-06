@@ -592,19 +592,13 @@ class TvShow(MediaEntity):
     dummy_episodes: list[TvShowEpisode] = field(default_factory=list)
     extra_fanart_urls: list[str] = field(default_factory=list)
     trailer: list[MediaTrailer] = field(default_factory=list)
+    # 不用 dict 方便修改 season
     episodes: list[TvShowEpisode] = field(default_factory=list)
     season_posters: dict[int, MediaFile] = field(default_factory=dict)
     season_fanarts: dict[int, MediaFile] = field(default_factory=dict)
     season_banners: dict[int, MediaFile] = field(default_factory=dict)
     season_thumbs: dict[int, MediaFile] = field(default_factory=dict)
-    seasons: list[TvShowSeason] = field(default_factory=list)
 
-@dataclass(kw_only=True)
-class TvShowSeason:
-    tv_show: TvShow
-    season: int
-    episodes: list[TvShowEpisode] = field(default_factory=list)
-    title: str = ""
 
 @dataclass(kw_only=True)
 class TvShowEpisode(MediaEntity):
@@ -622,5 +616,4 @@ class TvShowEpisode(MediaEntity):
     actors: list[Person]  =  field(default_factory=list)
     directors: list[Person]  =  field(default_factory=list)
     writers: list[Person]  =  field(default_factory=list)
-    tv_show: TvShow | None = None
     dummy: bool = False

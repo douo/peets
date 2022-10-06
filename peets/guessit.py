@@ -1,18 +1,20 @@
 from pathlib import Path
 from dataclasses import replace
-
+from pprint import pprint as pp
+from typing import Any, TypeVar
 from guessit.api import GuessItApi, guessit, merge_options
 from guessit.rules import rebulk_builder
 from guessit.rules.processors import Processors
 from guessit.rules.properties.audio_codec import audio_codec
 from guessit.rules.properties.crc import guess_idnumber
 from guessit.rules.properties.episode_title import POST_PROCESS, episode_title, title_seps
+from guessit.rules.properties.episodes import episodes
 from rebulk import CustomRule
 from rebulk.match import Match
-from peets.entities import MediaFileType, Movie, MediaEntity, TvShow, TvShowEpisode, TvShowSeason
+from peets.entities import MediaFileType, Movie, MediaEntity, TvShow, TvShowEpisode
 from peets.error import UnknownMediaTypeError
 from peets.merger import MapTable, create
-from peets.finder import  is_artwork_file, is_subtitle, is_video
+from peets.finder import  is_artwork_file, is_subtitle, is_video, traverse
 from enum import Enum
 
 
@@ -25,7 +27,10 @@ os.environ['REBULK_REGEX_ENABLED'] = '1'
 class NonMedia(Enum):
     TRAILER = 1
     SAMPLE = 2
+    PROCESSED = 3
 
+class _ProcessedException(Exception):
+    pass
 
 class _TittleSplitRule(CustomRule):
     priority = POST_PROCESS
@@ -56,10 +61,13 @@ class _TittleSplitRule(CustomRule):
 
 
 # FIXME multiple file movie
-def create_entity(path: Path)-> MediaEntity | NonMedia:
+def create_entity(path: Path, processed: set = set())-> MediaEntity | NonMedia:
     """
     one file one movie
     """
+    if path in processed:
+        return NonMedia.PROCESSED
+
     # 只能处理视频文件
     api = GuessItApi()
     def custom_rebulk(config):
@@ -77,18 +85,20 @@ def create_entity(path: Path)-> MediaEntity | NonMedia:
 
     # 非正片会被忽略，后续会通过关联的正片找到
     # 如果找不到，说明是独立的影片，是否没有入库的意义
-
-    match guess:
-        case {"other" : "Trailer"} | {"other" : ["Trailer", *_]} :
-            return NonMedia.TRAILER
-        case {"other" : "Sample"} | {"other" : ["Sample", *_]} :
-            return NonMedia.SAMPLE
-        case {"type": "movie"}:
-            return _create_movie(guess, path)
-        case {"type": "episode"}:
-            return _create_tvshow(guess, path)
-        case _:
-            raise UnknownMediaTypeError(guess)
+    try:
+        match guess:
+            case {"other" : "Trailer"} | {"other" : ["Trailer", *_]} :
+                return NonMedia.TRAILER
+            case {"other" : "Sample"} | {"other" : ["Sample", *_]} :
+                return NonMedia.SAMPLE
+            case {"type": "movie"}:
+                return _create_movie(guess, path, processed)
+            case {"type": "episode"}:
+                return _create_tvshow(guess, path, processed)
+            case _:
+                raise UnknownMediaTypeError(guess)
+    except _ProcessedException:
+        return NonMedia.PROCESSED
 
 def parse_mediafile_type(path: Path) -> MediaFileType:
     if is_video(path):
@@ -109,7 +119,7 @@ def parse_mediafile_type(path: Path) -> MediaFileType:
     #TODO other type
     return MediaFileType.UNKNOWN
 
-def _create_movie(guess: dict, path: Path) -> Movie: # type: ignore
+def _create_movie(guess: dict, path: Path, processed: set) -> Movie: # type: ignore
     # TODO 暂时只处理同级文件
     mfs = [(parse_mediafile_type(child), child) for child in path.parent.iterdir() if child != path]
     mfs = [c for c in mfs if c[0] is not MediaFileType.UNKNOWN]
@@ -122,34 +132,55 @@ def _create_movie(guess: dict, path: Path) -> Movie: # type: ignore
 
     mfs.append((MediaFileType.VIDEO, path))
     guess["media_files"] = mfs
-    guess['original_filename'] = path.name
+    return _do_create(processed, path, Movie, guess)
 
-    return create(Movie, guess)
+def _create_tvshow(guess, path: Path, processed: set) -> TvShow:
+    episode_guess = guess
+    # 预设可能目录情况有三种
+    # 1. tvshow/season/episode
+    # 2. tvshow/episode
+    # 3. .../episode
+    # TODO 相同剧集位于不同目录的情况 a/tvshow b/tvshow
 
-def _create_tvshow(guess, path: Path) -> TvShow:
-    episode = guess
-    from pprint import pprint as pp
-    pp(guess)
-    tvshow = episode
-    season = episode
+    season_maybe = path.parent
+    tvshow_maybe = path.parent.parent
+    if tvshow_maybe in processed or season_maybe in processed:
+        #当前剧集已被处理，抛出异常
+        raise _ProcessedException()
 
-    upper_1 = guessit(path.parent)
-    upper_2 = guessit(path.parent.parent)
-    if 'title' in upper_2 and upper_2['title'] == episode['title']:
-        tvshow = upper_2
+    tvshow_guess = guessit(tvshow_maybe)
+    tvshow_path = None
+    if 'title' in tvshow_guess and tvshow_guess['title'] == episode_guess['title']:
+        tvshow_path = tvshow_maybe
+    else:
+        tvshow_guess = guessit(season_maybe)
+        if 'title' in tvshow_guess and tvshow_guess['title'] == episode_guess['title']:
+            tvshow_path = season_maybe
+        else:
+            tvshow_guess = episode_guess
 
-    if 'title' in upper_1 and upper_1['title'] == episode['title']:
-        if tvshow != upper_2:
-            tvshow = upper_1
-        season = upper_1
+    if tvshow_path:
+        return _create_tvshow_batch(tvshow_guess, tvshow_path, processed)
+    else:
+        # 情况3
+        map_table:MapTable = [("audio_codec", "audio_codec", lambda a: "&".join(a))]
+        tvshow_guess['episodes'] = [_do_create(processed, path, TvShowEpisode, episode_guess, map_table)]
+        tvshow = create(TvShow, tvshow_guess, map_table)
+        return tvshow
 
-    map_table = [("audio_codec", "audio_codec", lambda a: "&".join(a))]
-    tvshow = create(TvShow, tvshow, map_table)
-    episode = create(TvShowEpisode, episode, map_table)
-    season = TvShowSeason(tv_show=tvshow,
-                          season=episode.season,
-                          episodes=[episode])
-
-    tvshow = replace(tvshow, episodes=[episode], seasons=[season])
-
+def _create_tvshow_batch(tvshow_guess, path: Path, processed: set) -> TvShow:
+    processed.add(path)
+    map_table:MapTable = [("audio_codec", "audio_codec", lambda a: "&".join(a))]
+    episodes: list[TvShowEpisode] = [_do_create(processed, p, TvShowEpisode, guess, map_table)
+                                     for p, guess in ((media, guessit(media)) for media in traverse(path))
+                                     if guess["type"] == "episode" and ("other" not in guess or ("Trailer" not in guess["other"] and "Sample" not in guess["other"]))
+    ]
+    tvshow_guess['episodes'] = episodes
+    tvshow = create(TvShow, tvshow_guess, map_table)
     return tvshow
+
+T = TypeVar('T')
+def _do_create(processed: set, path: Path, type_: type[T], addon: dict[str, Any], table: MapTable | None = None) -> T:
+    addon['original_filename'] = path.name
+    processed.add(path)
+    return create(type_, addon, table)
