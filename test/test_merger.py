@@ -98,6 +98,7 @@ def test_to_kwargs():
     }
 
 
+
 def test_to_kwargs_collections():
     # 目标类型是 list 或 dict
     # addon 对应类型是 item 或 key-value tuple
@@ -140,6 +141,15 @@ def test_tokwargs_field_not_exist():
 
     with pytest.raises(FieldNotExistError):
         to_kwargs(People, addon, [("pets", "not_exist")])
+
+    # map_table 定义的 key 在 addon 不存在
+    # 参数为 None 传入 map
+    # TODO 是否改为不执行 map
+    assert to_kwargs(People, {"name" : "Name"}, [("not_exist", "pets", lambda p: "" if p else "1")]) == {
+        "name" : "Name",
+        "pets" : ["1"]
+    }
+
 
 def test_to_kwargs_type_not_match():
     addon = {

@@ -1,6 +1,7 @@
 from pathlib import Path
 from dataclasses import replace
 from pprint import pprint as pp
+from collections.abc import Iterable
 from typing import Any, TypeVar
 from guessit.api import GuessItApi, guessit, merge_options
 from guessit.rules import rebulk_builder
@@ -150,6 +151,7 @@ def _create_tvshow(guess, path: Path, processed: set) -> TvShow:
 
     tvshow_guess = guessit(tvshow_maybe)
     tvshow_path = None
+    # FIXME 不可靠
     if 'title' in tvshow_guess and tvshow_guess['title'] == episode_guess['title']:
         tvshow_path = tvshow_maybe
     else:
@@ -163,24 +165,25 @@ def _create_tvshow(guess, path: Path, processed: set) -> TvShow:
         return _create_tvshow_batch(tvshow_guess, tvshow_path, processed)
     else:
         # 情况3
-        map_table:MapTable = [("audio_codec", "audio_codec", lambda a: "&".join(a))]
-        tvshow_guess['episodes'] = [_do_create(processed, path, TvShowEpisode, episode_guess, map_table)]
-        tvshow = create(TvShow, tvshow_guess, map_table)
+        tvshow_guess['episodes'] = [_do_create(processed, path, TvShowEpisode, episode_guess)]
+        tvshow = _do_create(processed, path, TvShow, tvshow_guess)
         return tvshow
 
 def _create_tvshow_batch(tvshow_guess, path: Path, processed: set) -> TvShow:
-    processed.add(path)
-    map_table:MapTable = [("audio_codec", "audio_codec", lambda a: "&".join(a))]
-    episodes: list[TvShowEpisode] = [_do_create(processed, p, TvShowEpisode, guess, map_table)
+    episodes: list[TvShowEpisode] = [_do_create(processed, p, TvShowEpisode, guess)
                                      for p, guess in ((media, guessit(media)) for media in traverse(path))
                                      if guess["type"] == "episode" and ("other" not in guess or ("Trailer" not in guess["other"] and "Sample" not in guess["other"]))
     ]
     tvshow_guess['episodes'] = episodes
-    tvshow = create(TvShow, tvshow_guess, map_table)
+    tvshow = _do_create(processed, path, TvShow, tvshow_guess)
     return tvshow
 
+_map_table:MapTable = [("audio_codec", "audio_codec", lambda a: ("&".join(a)) if isinstance(a, Iterable) else (a if a else "")),
+                       ("title", "title", lambda a:  a[0] if isinstance(a, list) else a)]
+
 T = TypeVar('T')
-def _do_create(processed: set, path: Path, type_: type[T], addon: dict[str, Any], table: MapTable | None = None) -> T:
+def _do_create(processed: set, path: Path, type_: type[T], addon: dict[str, Any], table: MapTable | None = _map_table) -> T:
     addon['original_filename'] = path.name
     processed.add(path)
+    pp(addon)
     return create(type_, addon, table)
