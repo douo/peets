@@ -202,5 +202,4 @@ _map_table:MapTable = [("audio_codec", "audio_codec", lambda a: ("&".join(a)) if
 T = TypeVar('T')
 def _do_create(processed: set, path: Path, type_: type[T], addon: dict[str, Any], table: MapTable | None = _map_table) -> T:
     processed.add(path)
-    pp(addon)
     return create(type_, addon, table)

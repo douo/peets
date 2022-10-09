@@ -4,17 +4,11 @@ from peets.entities import MediaFileType, Movie, MediaCertification, MovieSet
 from peets.iso import Language, Country
 import os
 import json
-from distutils import dir_util
 from pytest import fixture
+from util import datadir
 
-def test_detail(datadir, mocker):
-    with open(f"{datadir}/movie.json") as f:
-        data = json.load(f)
-
-    mocker.patch(
-        "tmdbsimple.Movies._GET",
-        return_value=data
-    )
+def test_detail(hijack, mocker):
+    data = hijack("movie.json")
 
     tmdb = TmdbMovieMetadata(language=Language.ZH,
                              country=Country.CN)
@@ -28,14 +22,9 @@ def test_detail(datadir, mocker):
     assert m.ids["tmdbSet"] == '131296'
     # print(generate_nfo(m))
 
-def test_artwork(datadir, mocker):
-    with open(f"{datadir}/movie_images.json") as f:
-        data = json.load(f)
+def test_artwork(hijack, mocker):
+    data = hijack("movie_images.json")
 
-    mocker.patch(
-        "tmdbsimple.Movies._GET",
-        return_value=data
-    )
     tmdb = TmdbArtworkProvider(language=Language.ZH,
                              country=Country.CN)
 
@@ -46,14 +35,8 @@ def test_artwork(datadir, mocker):
         MediaFileType.FANART: "https://image.tmdb.org/t/p/original/5pxdgKVEDWDQBtvqIB2eB2oheml.jpg"
     }
 
-def test_metadata_original_release_date_only(datadir, mocker):
-    with open(f"{datadir}/movie_original_release_date_only.json") as f:
-        data = json.load(f)
-
-    mocker.patch(
-        "tmdbsimple.Movies._GET",
-        return_value=data
-    )
+def test_metadata_original_release_date_only(hijack, mocker):
+    hijack("movie_original_release_date_only.json")
 
     tmdb = TmdbMovieMetadata(language=Language.ZH,
                              country=Country.CN)
@@ -61,15 +44,8 @@ def test_metadata_original_release_date_only(datadir, mocker):
 
     assert m.release_date == "2022-07-08"
 
-def test_metadata_certification(datadir, mocker):
-    with open(f"{datadir}/movie_certification.json") as f:
-        data = json.load(f)
-
-    mocker.patch(
-        "tmdbsimple.Movies._GET",
-        return_value=data
-    )
-
+def test_metadata_certification(hijack, mocker):
+    hijack("movie_certification.json")
     tmdb = TmdbMovieMetadata(language=Language.ZH,
                              country=Country.CN)
     m = tmdb.apply(Movie(), id_=0)
@@ -78,16 +54,14 @@ def test_metadata_certification(datadir, mocker):
 
 
 @fixture
-def datadir(tmpdir, request):
-    '''
-    Fixture responsible for searching a folder with the same name of test
-    module and, if available, moving all contents to a temporary directory so
-    tests can use them freely.
-    '''
-    filename = request.module.__file__
-    test_dir, _ = os.path.splitext(filename)
+def hijack(datadir, mocker, request):
+    def _inner(name:str):
+        with open(f"{datadir}/{name}") as f:
+            data = json.load(f)
 
-    if os.path.isdir(test_dir):
-        dir_util.copy_tree(test_dir, str(tmpdir))
-
-    return tmpdir
+        mocker.patch(
+                "tmdbsimple.Movies._GET",
+            return_value=data
+        )
+        return data
+    return _inner

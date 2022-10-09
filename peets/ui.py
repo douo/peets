@@ -10,7 +10,7 @@ from teletype.io import get_key, style_format, style_print, strip_format, style_
 from tmdbsimple import Account
 from typing_inspect import TypeVar
 
-from peets.entities import MediaArtworkType, MediaEntity, MediaFileType
+from peets.entities import MediaArtworkType, MediaEntity, MediaFileType, TvShow
 from peets.merger import replace
 from peets.nfo  import generate_nfo
 import peets.naming as naming
@@ -78,12 +78,16 @@ def modify(media: T, attr: str) -> T:
 
 def brief(media: MediaEntity):
     print(f"Type: {type(media).__name__}")
-    print(f"Name: {media.title}")
+    print(f"Title: {media.title}")
     print(f"Year: {media.year}")
     for k, v in media.ids.items():
         print(f"{k}: {v}")
     for mf in media.media_files:
         print(f"{mf[0].name}: {mf[1]}")
+
+    if isinstance(media, TvShow):
+        for e in media.episodes:
+            print(f"S{e.season:02d}E{e.episode:02d}")
 
 def do_fill(media: T) -> T:
     id_  = style_input("tmdb id:", style=["blue", "bold"])
