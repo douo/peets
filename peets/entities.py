@@ -599,6 +599,11 @@ class TvShow(MediaEntity):
     season_banners: dict[int, MediaFile] = field(default_factory=dict)
     season_thumbs: dict[int, MediaFile] = field(default_factory=dict)
 
+    def retrieve_episode(self, season: int, episode: int) -> "TvShowEpisode" | None:
+        for e in self.episodes:
+            if e.season == season and e.episode == episode:
+                return e
+
 
 @dataclass(kw_only=True)
 class TvShowEpisode(MediaEntity):

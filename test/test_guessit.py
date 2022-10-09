@@ -1,5 +1,5 @@
 from pathlib import Path
-from peets.entities import Movie, TvShow
+from peets.entities import Movie, TvShow, TvShowEpisode
 from peets.entities import MediaFileType, Movie
 
 from peets.guessit import NonMedia, create_entity
@@ -81,8 +81,9 @@ def test_create_entity_with_sample(tmp_path):
 
 
 def test_create_tvshow(tmp_path):
-    f1 = create_file("Severance.S01E01.Good.News.About.Hell.REPACK.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES.mkv", tmp_path, parent="Severance.S01.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES")
-    f2 = create_file("Severance.S01E02.Good.News.About.Hell.REPACK.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES.mkv", tmp_path, parent="Severance.S01.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES")
+    parent="Severance.S01.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES"
+    f1 = create_file("Severance.S01E01.Good.News.About.Hell.REPACK.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES.mkv", tmp_path, parent=parent)
+    f2 = create_file("Severance.S01E02.Good.News.About.Hell.REPACK.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES.mkv", tmp_path, parent=parent)
     processed = set()
     m = create_entity(f1, processed)
     assert isinstance(m, TvShow)
@@ -95,7 +96,37 @@ def test_create_tvshow(tmp_path):
     m = create_entity(f1, processed)
     assert m is NonMedia.PROCESSED
 
-    f3 = create_file("Severance.S01E03.Good.News.About.Hell.REPACK.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES.mkv", tmp_path, parent="Severance.S01.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES")
+    f3 = create_file("Severance.S01E03.Good.News.About.Hell.REPACK.2160p.ATVP.WEB-DL.DDP5.1.Atmos.HEVC-TEPES.mkv", tmp_path, parent=parent)
     m = create_entity(f3, processed)
     # tvshow 目录不会重复处理
     assert m is NonMedia.PROCESSED
+
+    # media file
+    mf = [
+        f"{f1.stem}.nfo",
+        f"{f1.stem}-banner.jpg",
+        f"{f1.stem}-clearart.jpg",
+        f"{f1.stem}-clearlogo.jpg",
+        f"{f1.stem}-fanart.jpg",
+        f"{f1.stem}-logo.jpg",
+        f"{f1.stem}-poster.jpg"
+    ]
+
+    excepts = [
+        MediaFileType.NFO,
+        MediaFileType.BANNER,
+        MediaFileType.CLEARART,
+        MediaFileType.CLEARLOGO,
+        MediaFileType.FANART,
+        MediaFileType.LOGO,
+        MediaFileType.POSTER
+    ]
+    mf = [create_file(f, tmp_path, parent) for f in mf]
+
+    m = create_entity(f1, set())
+    assert isinstance(m, TvShow)
+    assert len(m.episodes) == 3
+    assert len(m.retrieve_episode(1,2).media_files) == 1
+    assert len(m.retrieve_episode(1,3).media_files) == 1
+    mf_episode = [mf[0] for mf in m.retrieve_episode(1,1).media_files if mf[0] != MediaFileType.VIDEO]
+    assert set(mf_episode) == set(excepts)

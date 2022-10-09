@@ -120,19 +120,25 @@ def parse_mediafile_type(path: Path) -> MediaFileType:
     #TODO other type
     return MediaFileType.UNKNOWN
 
+
+
+
 def _create_movie(guess: dict, path: Path, processed: set) -> Movie: # type: ignore
-    # TODO 暂时只处理同级文件
+    # 找出相关的 MediaFile
     mfs = [(parse_mediafile_type(child), child) for child in path.parent.iterdir() if child != path]
     mfs = [c for c in mfs if c[0] is not MediaFileType.UNKNOWN]
     # 如果有存在 trailer 或者 sample 之外的视频存在，则认为目录存放有多个视频文件
     multi_movie_dir = bool(mfs) and MediaFileType.VIDEO in next(zip(*mfs))
     # 如果是 mmd 则 mediafile 中含有当前文件名的才能被认为是属于当前的资源
     if multi_movie_dir:
+        # mmd 目录，名称相同才会被认为是相关的 MediaFile
         mfs = [c for c in mfs if path.stem in c[1].stem and c[0] != MediaFileType.VIDEO]
         guess["multi_movie_dir"] = True
 
     mfs.append((MediaFileType.VIDEO, path))
     guess["media_files"] = mfs
+    guess['original_filename'] = path.name
+
     return _do_create(processed, path, Movie, guess)
 
 def _create_tvshow(guess, path: Path, processed: set) -> TvShow:
@@ -165,25 +171,36 @@ def _create_tvshow(guess, path: Path, processed: set) -> TvShow:
         return _create_tvshow_batch(tvshow_guess, tvshow_path, processed)
     else:
         # 情况3
-        tvshow_guess['episodes'] = [_do_create(processed, path, TvShowEpisode, episode_guess)]
+        tvshow_guess['episodes'] = [_do_create(processed, path, TvShowEpisode, _do_guess_episode(path, episode_guess)[1])]
         tvshow = _do_create(processed, path, TvShow, tvshow_guess)
         return tvshow
 
 def _create_tvshow_batch(tvshow_guess, path: Path, processed: set) -> TvShow:
     episodes: list[TvShowEpisode] = [_do_create(processed, p, TvShowEpisode, guess)
-                                     for p, guess in ((media, guessit(media)) for media in traverse(path))
+                                     for p, guess in (_do_guess_episode(media) for media in traverse(path))
                                      if guess["type"] == "episode" and ("other" not in guess or ("Trailer" not in guess["other"] and "Sample" not in guess["other"]))
-    ]
+                                     ]
+
     tvshow_guess['episodes'] = episodes
     tvshow = _do_create(processed, path, TvShow, tvshow_guess)
     return tvshow
+
+def _do_guess_episode(path: Path, addon: dict|None = None) -> tuple[Path, dict]:
+    mfs = [(parse_mediafile_type(child), child) for child in path.parent.iterdir() if child != path and child.stem.startswith(path.stem)]
+    mfs = [c for c in mfs if c[0] is not MediaFileType.UNKNOWN]
+    mfs.append((MediaFileType.VIDEO, path))
+    if not addon:
+        addon = guessit(path)
+    addon["media_files"] = mfs
+    addon['original_filename'] = path.name
+    return (path, addon)
+
 
 _map_table:MapTable = [("audio_codec", "audio_codec", lambda a: ("&".join(a)) if isinstance(a, Iterable) else (a if a else "")),
                        ("title", "title", lambda a:  a[0] if isinstance(a, list) else a)]
 
 T = TypeVar('T')
 def _do_create(processed: set, path: Path, type_: type[T], addon: dict[str, Any], table: MapTable | None = _map_table) -> T:
-    addon['original_filename'] = path.name
     processed.add(path)
     pp(addon)
     return create(type_, addon, table)
