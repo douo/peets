@@ -1,6 +1,6 @@
 from peets.tmdb import TmdbMovieMetadata, TmdbArtworkProvider
 from peets.nfo import generate_nfo
-from peets.entities import MediaFileType, Movie, MediaCertification, MovieSet
+from peets.entities import MediaAiredStatus, MediaFileType, MediaGenres, Movie, MediaCertification, MovieSet, TvShow
 from peets.iso import Language, Country
 import os
 import json
@@ -52,6 +52,27 @@ def test_metadata_certification(hijack, mocker):
 
     assert m.certification == MediaCertification.US_PG13
 
+def test_tvshow(hijack, mocker):
+    hijack("tvshow.json")
+    tmdb = TmdbMovieMetadata(language=Language.ZH,
+                             country=Country.CN)
+    m = tmdb.apply(TvShow(), id_=0)
+
+    assert m.ids["tmdb"] == "95396"
+    assert m.title == "Severance"
+    assert m.first_aired == "2022-02-17"
+    assert m.country == "US"
+    assert m.runtime == 50
+    assert m.production_company == "Apple TV+, Red Hour, Endeavor Content, Fifth Season"
+    assert m.status == MediaAiredStatus.CONTINUING
+    assert m.year == 2022
+    assert len(m.actors) == 10
+    assert m.ids["imdb"] == "tt11280740"
+    assert m.ids["tvdb"] == "371980"
+    assert m.certification == MediaCertification.US_TVMA
+    assert set(m.genres) == {MediaGenres.DRAMA, MediaGenres.SCIENCE_FICTION, MediaGenres.MYSTERY}
+
+
 
 @fixture
 def hijack(datadir, mocker, request):
@@ -60,7 +81,7 @@ def hijack(datadir, mocker, request):
             data = json.load(f)
 
         mocker.patch(
-                "tmdbsimple.Movies._GET",
+                "tmdbsimple.base.TMDB._GET",
             return_value=data
         )
         return data

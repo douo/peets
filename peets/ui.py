@@ -46,7 +46,6 @@ def interact(media: MediaEntity, lib_path: Path, naming_style: str):
     }
     hint = lambda : style_print(", ".join([f"{label} ({key})" for label, key, _ in ops.values()]),
                                 style=["green", "bold"])
-
     hint()
     while sel := get_key() :
         print(sel)
@@ -103,12 +102,12 @@ def do_search(media: MediaEntity):
     if result:
         choices = [ChoiceHelper(
             s,
-            label= f"{s['title']} - {s['release_date']} - {s['popularity']}({s['id']})",
+            label= f"{s.title} - {s.year} - {s.rank}({s.id_})",
             style="bold"
         ) for s in result]
         pick =  SelectOne(choices).prompt()
         print("Fetching...")
-        new_ =  scraper.apply(media, id_ = pick["id"])
+        new_ =  scraper.apply(media, id_ = pick.id_)
         scraper = artwork(media)
         return scraper.apply(new_)
     else:

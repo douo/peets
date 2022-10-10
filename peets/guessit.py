@@ -145,7 +145,7 @@ def _create_tvshow(guess, path: Path, processed: set) -> TvShow:
     episode_guess = guess
     # 预设可能目录情况有三种
     # 1. tvshow/season/episode
-    # 2. tvshow/episode
+    # 2. tvshow(season)/episode
     # 3. .../episode
     # TODO 相同剧集位于不同目录的情况 a/tvshow b/tvshow
 
@@ -155,17 +155,27 @@ def _create_tvshow(guess, path: Path, processed: set) -> TvShow:
         #当前剧集已被处理，抛出异常
         raise _ProcessedException()
 
-    tvshow_guess = guessit(tvshow_maybe)
+
     tvshow_path = None
     # FIXME 不可靠
-    if 'title' in tvshow_guess and tvshow_guess['title'] == episode_guess['title']:
+    #breakpoint()
+    def _is_tvshow_of(episode, maybe)-> dict | None:
+        tvshow_guess = guessit(maybe)
+        # episode 可能有两个标题第一个是 tvshow 第二个是 episode
+        title = episode['title'][0] if type(episode['title']) is list else episode['title']
+        if ('title' in tvshow_guess
+            and type(tvshow_guess['title']) is str
+            and tvshow_guess['title'].casefold() == title.casefold()):
+            return tvshow_guess
+
+
+
+    if tvshow_guess := _is_tvshow_of(episode_guess, tvshow_maybe):
         tvshow_path = tvshow_maybe
+    elif tvshow_guess := _is_tvshow_of(episode_guess, season_maybe):
+        tvshow_path = season_maybe
     else:
-        tvshow_guess = guessit(season_maybe)
-        if 'title' in tvshow_guess and tvshow_guess['title'] == episode_guess['title']:
-            tvshow_path = season_maybe
-        else:
-            tvshow_guess = episode_guess
+        tvshow_guess = episode_guess
 
     if tvshow_path:
         return _create_tvshow_batch(tvshow_guess, tvshow_path, processed)
@@ -196,6 +206,7 @@ def _do_guess_episode(path: Path, addon: dict|None = None) -> tuple[Path, dict]:
     return (path, addon)
 
 
+# TODO guessit 属性可能是值或者列表，处理起来很不方便
 _map_table:MapTable = [("audio_codec", "audio_codec", lambda a: ("&".join(a)) if isinstance(a, Iterable) else (a if a else "")),
                        ("title", "title", lambda a:  a[0] if isinstance(a, list) else a)]
 

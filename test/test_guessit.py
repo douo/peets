@@ -4,6 +4,7 @@ from peets.entities import MediaFileType, Movie
 
 from peets.guessit import NonMedia, create_entity
 from guessit import guessit
+from peets.ui import interact
 
 from util import create_file
 
@@ -130,3 +131,5 @@ def test_create_tvshow(tmp_path):
     assert len(m.retrieve_episode(1,3).media_files) == 1
     mf_episode = [mf[0] for mf in m.retrieve_episode(1,1).media_files if mf[0] != MediaFileType.VIDEO]
     assert set(mf_episode) == set(excepts)
+
+    interact(m, tmp_path, "simple")

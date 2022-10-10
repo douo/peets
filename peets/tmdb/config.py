@@ -16,4 +16,4 @@ def _enable_log():
     requests_log.setLevel(logging.DEBUG)
     requests_log.propagate = True
 
-# _enable_log
+#_enable_log()

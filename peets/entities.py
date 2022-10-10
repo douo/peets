@@ -45,7 +45,13 @@ class MediaCertification(Enum):
             case _:
                 return ""
 
-
+    @classmethod
+    def retrieve(cls, cert: str, country: str) -> MediaCertification:
+        members = cls.__members__
+        for m in members.values():
+            if m.country.name.lower() == country.lower() and cert in m.possible_notations:
+                return m
+        return MediaCertification.UNKNOWN
 
     US_G = (Country.US, "G", [ "G", "Rated G" ])
     US_PG = (Country.US, "PG", [ "PG", "Rated PG" ])
@@ -577,8 +583,31 @@ class Movie(MediaEntity):
     localized_spoken_languages:str = ""
 
 
+class MediaAiredStatus(Enum):
+
+    def __init__(self, name_: str, possible_notations: list[str]) -> None:
+        self.name_ = name_
+        self.possible_notations = possible_notations
+
+
+    UNKNOWN = ("Unknown", [])
+    CONTINUING = ("Continuing",["continuing", "returning series"])
+    ENDED = ("Ended", ["ended"])
+
+    @classmethod
+    def retrieve_status(cls, val: str) -> 'MediaAiredStatus':
+        members = cls.__members__
+        for m in members.values():
+            if val.lower() in m.possible_notations:
+                return m
+        return MediaAiredStatus.UNKNOWN
+
+
 @dataclass(kw_only=True)
 class TvShow(MediaEntity):
+    first_aired: str = "" # date
+    status: MediaAiredStatus = MediaAiredStatus.UNKNOWN
+    runtime:int = 0 # 时长
     sort_title: str = ""
     certification: MediaCertification = MediaCertification.UNKNOWN
     country: str = ""
