@@ -3,7 +3,7 @@ import pytest
 from dataclasses import dataclass, field
 from typing import get_type_hints
 
-from peets.merger import FieldNotExistError, to_kwargs, replace, TypeNotMatchError, create
+from peets.merger import FieldNotExistError, MapTable, to_kwargs, replace, UnexceptType, create
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -157,7 +157,7 @@ def test_to_kwargs_type_not_match():
         "age" : "abc",
     }
 
-    with pytest.raises(TypeNotMatchError):
+    with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
 
 
@@ -166,7 +166,7 @@ def test_to_kwargs_type_not_match():
         "pets" : 1
     }
 
-    with pytest.raises(TypeNotMatchError):
+    with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
 
     addon = {
@@ -174,7 +174,7 @@ def test_to_kwargs_type_not_match():
         "tools" : (1,1)
     }
 
-    with pytest.raises(TypeNotMatchError):
+    with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
 
 
@@ -184,7 +184,7 @@ def test_to_kwargs_type_not_match():
         "pets" : [1,2,3]
     }
 
-    with pytest.raises(TypeNotMatchError):
+    with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
 
     addon = {
@@ -192,7 +192,7 @@ def test_to_kwargs_type_not_match():
         "tools" : {1:1}
     }
 
-    with pytest.raises(TypeNotMatchError):
+    with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
 
 
@@ -203,7 +203,7 @@ def test_to_kwargs_type_not_match():
         "pets" : ["dog", 2, "cat"]
     }
 
-    with pytest.raises(TypeNotMatchError):
+    with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
 
     addon = {
@@ -211,14 +211,14 @@ def test_to_kwargs_type_not_match():
         "tools" : {"pen": 1, 3: "disc"}
     }
 
-    with pytest.raises(TypeNotMatchError):
+    with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
 
 def test_to_kwargs_nested_map_table():
 
     addon = {
         "department": "Demo",
-        "manager": {
+        "bigman": {
             "name": "Demo",
             "pets": ["dog", "cat"],
             "label": "M"
@@ -242,16 +242,19 @@ def test_to_kwargs_nested_map_table():
         }
     }
 
-    table = [
+    people_table: MapTable = [("label", "title")]
+
+    table: MapTable = [
         ("department", "name"),
-        ("worker", "employee",
-         lambda ps: [to_kwargs(People, p, [("label", "title")]) for p in ps])
+        ("bigman", "manager", people_table),
+        ("worker", "employee", people_table)
     ]
 
     assert to_kwargs(Department, addon, table) == {
         "name": "Demo",
         "manager": {
             "name": "Demo",
+            "title": "M",
             "pets": ["dog", "cat"]
         },
         "employee": [

@@ -7,8 +7,9 @@ from dataclasses import replace as data_replace
 from peets.entities import MediaEntity
 from abc import ABCMeta, abstractmethod
 
-class TypeNotMatchError(Exception):
+class UnexceptType(Exception):
     pass
+
 
 class FieldNotExistError(Exception):
     pass
@@ -49,8 +50,8 @@ def _make_sure_table(map_table: MapTable) -> StictMapTable:
     make sure all item is tuple
     """
     return  list(map(lambda i: i if len(i) == 3 else i + (map(lambda _: None, i[1]),), #  补全省略的 converter
-                map(lambda i: tuple(map(lambda j:  _make_sure_tuple(j), i)), # 确保所有元素都是 tuple
-            map_table)
+                     map(lambda i: tuple(map(lambda j:  _make_sure_tuple(j), i)), # 确保所有元素都是 tuple
+                         map_table)
     )) # type: ignore
 
 
@@ -136,7 +137,10 @@ def to_kwargs(type_: Any, addon: dict[str, Any], table: MapTable | None = None) 
 
     result = { }
 
-    _converter_as_map_table = lambda conv: cast(MapTable, conv) if (conv and type(conv) is MapTable) else None
+    def _map_table_guard(conv) -> TypeGuard[MapTable]:
+         if not conv or len(conv) == 0 or type(conv[0]) is tuple:
+             return True
+         raise UnexceptType(f"conv is {type(conv)} should be MapTable")
 
     for item in map_table:
         key, target, converter = item
@@ -150,8 +154,9 @@ def to_kwargs(type_: Any, addon: dict[str, Any], table: MapTable | None = None) 
             if _is_assignable(v_type, f_type):
                 result[attr] = v
             elif (f_item_type := _get_mergeable(f_type)) and v_type is dict:
-                v = cast(dict[str, Any], v)
-                result[attr] = to_kwargs(f_item_type, v, _converter_as_map_table(conv))
+                if _map_table_guard(conv):
+                    v = cast(dict[str, Any], v)
+                    result[attr] = to_kwargs(f_item_type, v, conv)
             # TODO Sequences
             elif get_origin(f_type) is list:
                 old = result[attr] if attr in result else []
@@ -161,17 +166,19 @@ def to_kwargs(type_: Any, addon: dict[str, Any], table: MapTable | None = None) 
                     if _check_iterable_type(v, f_item_type):
                         old += v
                     elif (f_item_mergeable_type := _get_mergeable(f_item_type)) and _check_iterable_type(v, dict):
-                        v = cast(list[dict[str, Any]], v)
-                        old += [to_kwargs(f_item_mergeable_type, v_i, _converter_as_map_table(conv)) for v_i in v]
+                        if _map_table_guard(conv):
+                            v = cast(list[dict[str, Any]], v)
+                            old += [to_kwargs(f_item_mergeable_type, v_i, conv) for v_i in v]
                     else:
-                        raise TypeNotMatchError(f"Get Type {v_type}, filed {attr} type is {f_type}")
+                        raise UnexceptType(f"Get Type {v_type}, except {attr} type is {f_type}")
                 elif _is_assignable(v_type, f_item_type):
                     old.append(v)
                 elif (f_item_mergeable_type := _get_mergeable(f_item_type)) and v_type is dict:
-                    v = cast(dict[str, Any], v)
-                    old.append(to_kwargs(f_item_mergeable_type, v, _converter_as_map_table(conv)))
+                    if _map_table_guard(conv):
+                        v = cast(dict[str, Any], v)
+                        old.append(to_kwargs(f_item_mergeable_type, v, conv))
                 else:
-                    raise TypeNotMatchError(f"Get Type {v_type}, filed {attr} type is {f_type}")
+                    raise UnexceptType(f"Get Type {v_type}, except {attr} type is {f_type}")
 
                 result[attr] = old
 
@@ -185,23 +192,25 @@ def to_kwargs(type_: Any, addon: dict[str, Any], table: MapTable | None = None) 
                     if _check_dict_type(v, cast(tuple[Any, Any], get_args(f_type))):
                         old |= v
                     elif (f_value_mergeable_type := _get_mergeable(f_value_type)) and _check_iterable_type(v.keys(), f_key_type) and _check_iterable_type(v.values(), dict): # 只对 value 进行处理
-                        v = cast(dict[f_key_type, dict[str, Any]], v)
-                        old |= {k: to_kwargs(f_value_mergeable_type, v_i, _converter_as_map_table(conv)) for k, v_i in v.items()}
+                        if _map_table_guard(conv):
+                            v = cast(dict[f_key_type, dict[str, Any]], v)
+                            old |= {k: to_kwargs(f_value_mergeable_type, v_i, conv) for k, v_i in v.items()}
                     else:
-                        raise TypeNotMatchError(f"Get Type {v_type}, filed {attr} type is {f_type}")
+                        raise UnexceptType(f"Get Type {v_type}, except {attr} type is {f_type}")
                 elif isinstance(v, tuple):
                     if _is_assignable(type(v[0]), f_key_type) and _is_assignable(type(v[1]), f_value_type): #FIXME 没类型推定？
                         old.__setitem__(*v)
                     elif (f_value_mergeable_type  := _get_mergeable(f_value_type)) and _is_assignable(type(v[0]), f_key_type) and _is_assignable(type(v[1]), dict[str, Any]):
-                        v = cast(tuple[f_key_type, dict[str, Any]], v)
-                        old[v[0]] = to_kwargs(f_value_mergeable_type, v[1],  _converter_as_map_table(conv))
+                        if _map_table_guard(conv):
+                            v = cast(tuple[f_key_type, dict[str, Any]], v)
+                            old[v[0]] = to_kwargs(f_value_mergeable_type, v[1],  conv)
                     else:
-                        raise TypeNotMatchError(f"Get Type {v_type}, filed {attr} type is {f_type}")
+                        raise UnexceptType(f"Get Type {v_type}, except {attr} type is {f_type}")
                 else:
-                    raise TypeNotMatchError(f"Get Type {v_type}, filed {attr} type is {f_type}")
+                    raise UnexceptType(f"Get Type {v_type}, except {attr} type is {f_type}")
                 result[attr] = old
             else:
-                raise TypeNotMatchError(f"Get Type {type(v)}, filed {attr} type is {f_type}")
+                raise UnexceptType(f"Get Type {type(v)}, except {attr} type is {f_type}")
 
 
     return result

@@ -1,6 +1,6 @@
 from peets.tmdb import TmdbMovieMetadata, TmdbArtworkProvider
 from peets.nfo import generate_nfo
-from peets.entities import MediaAiredStatus, MediaFileType, MediaGenres, Movie, MediaCertification, MovieSet, TvShow
+from peets.entities import MediaAiredStatus, MediaFileType, MediaGenres, Movie, MediaCertification, MovieSet, TvShow, TvShowEpisode
 from peets.iso import Language, Country
 import os
 import json
@@ -53,10 +53,12 @@ def test_metadata_certification(hijack, mocker):
     assert m.certification == MediaCertification.US_PG13
 
 def test_tvshow(hijack, mocker):
-    hijack("tvshow.json")
+    hijack("tvshow.json", "tmdbsimple.TV._GET")
+    hijack("season.json", "tmdbsimple.TV_Seasons._GET")
     tmdb = TmdbMovieMetadata(language=Language.ZH,
                              country=Country.CN)
-    m = tmdb.apply(TvShow(), id_=0)
+    episodes = [TvShowEpisode(season=1, episode=1)]
+    m = tmdb.apply(TvShow(episodes=episodes), id_=0)
 
     assert m.ids["tmdb"] == "95396"
     assert m.title == "Severance"
@@ -71,17 +73,29 @@ def test_tvshow(hijack, mocker):
     assert m.ids["tvdb"] == "371980"
     assert m.certification == MediaCertification.US_TVMA
     assert set(m.genres) == {MediaGenres.DRAMA, MediaGenres.SCIENCE_FICTION, MediaGenres.MYSTERY}
+    assert len(m.seasons) == 1
+    s = m.seasons[0]
+    assert s.air_date == "2022-02-17"
+    assert s.episode_count == 9
+    assert s.name == "第 1 季"
+    assert s.season == 1
 
-
+    assert len(m.episodes) == 1
+    e = m.episodes[0]
+    assert e.first_aired == "2022-02-17"
+    assert e.ids["tmdb"] == "1982925"
+    assert e.season == 1
+    assert e.episode == 1
+    assert len(e.actors) == 9
 
 @fixture
 def hijack(datadir, mocker, request):
-    def _inner(name:str):
+    def _inner(name:str, path="tmdbsimple.base.TMDB._GET"):
         with open(f"{datadir}/{name}") as f:
             data = json.load(f)
 
         mocker.patch(
-                "tmdbsimple.base.TMDB._GET",
+                path,
             return_value=data
         )
         return data

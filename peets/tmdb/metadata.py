@@ -1,13 +1,15 @@
 from __future__ import annotations
 from abc import ABC
+import dataclasses
 from datetime import datetime
-from functools import singledispatchmethod
+from functools import partial, singledispatchmethod
+import itertools
 from typing import TypeVar
 from dateutil.parser import isoparse
 from typing_extensions import TypeAlias
 from tmdbsimple.movies import Movies
 from peets.entities import MediaCertification, MediaEntity, Movie, MediaFileType, MediaRating, MediaGenres, MediaArtwork, MediaArtworkType, MovieSet, Person, PersonType, TvShow, MediaAiredStatus
-from peets.merger import MapTable, replace
+from peets.merger import MapTable, replace, to_kwargs
 from peets.iso import Language, Country
 from peets.scraper import Feature, MetadataProvider, Provider, SearchResult
 import tmdbsimple as tmdb
@@ -124,11 +126,48 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
     @apply.register
     def _(self, tvshow: TvShow, **kwargs) -> TvShow:
         m_id = kwargs['id_']
+
+        episode_table: MapTable = [
+            # TODO external ids 需要调用 episode api
+            ("id","ids", lambda id_: (PROVIDER_ID, str(id_))),
+            ("season_number", "season"),
+            ("episode_number", "episode"),
+            ("name", "title"),
+            ("overview", "plot"),
+            (("vote_average", "vote_count"),
+             "ratings",
+             lambda va, vc : (PROVIDER_ID, MediaRating(rating_id = "tmdb", rating=va, votes=vc))
+             ),
+            ("air_date", "first_aired"),
+            ("crew", ("directors", "writers"),
+             (_crew_filter(PersonType.DIRECTOR), _crew_filter(PersonType.WRITER))),
+            ("guest_stars",
+             "actors",
+             lambda guest_starts: [_conv_people(c, PersonType.ACTOR) for c in guest_starts]),
+            (("still_path", "id"), "artwork_url_map",  #TODO artwork 应该另外处理？
+             lambda path, id_: (MediaFileType.THUMB, f"{_ARTWORK_BASE_URL}original{path}"))
+        ]
+        episodes = []
+        for key, group in itertools.groupby(tvshow.episodes, lambda e: e.season):
+            season_context = tmdb.TV_Seasons(m_id, key).info(language=self.language)
+            for episode in group:
+                context = season_context["episodes"][episode.episode - 1]
+                episodes.append(replace(episode, context, episode_table))
+
         api = tmdb.TV(m_id)
-        context = api.info(
+        tv_context = api.info(
             language=self.language,
             append_to_response="credits, external_ids, content_ratings, keywords"
         )
+
+
+        season_table: MapTable = [
+            ("overview", "plot"),
+            ("season_number", "season"),
+            ("poster_path",
+             "artwork_url_map",  #TODO artwork 应该另外处理？
+             lambda path: (MediaFileType.POSTER, f"{_ARTWORK_BASE_URL}original{path}"))
+        ]
         # lambda 表达式语法太繁琐
         table: MapTable = [
             ("id","ids", lambda id_: (PROVIDER_ID, str(id_))),
@@ -155,11 +194,12 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
             (("content_ratings", "production_countries"), "certification", lambda content_ratings, production_countries: self._parse_content_rating(content_ratings, production_countries)),
             ("genres", "genres", lambda genres: [_to_genre(g) for g in genres]),
             ("adult", "genres", lambda adult: MediaGenres.EROTIC if adult else []),
-            ("keywords", "tags", lambda keywords: [k["name"] for k in keywords["results"]])
-            #TODO Season Name
+            ("keywords", "tags", lambda keywords: [k["name"] for k in keywords["results"]]),
+            ("seasons", "seasons", season_table)
         ]
 
-        return replace(tvshow, context, table)
+        tvshow = replace(tvshow, tv_context, table)
+        return dataclasses.replace(tvshow, episodes = episodes)
 
     # 按本地化、US、原始发行国的顺序取值
     def _parse_release_date(self, release_dates, production_countries) -> str:
@@ -232,6 +272,34 @@ def _find_release_dates(release_dates, countries):
 
     return result
 
+def _conv_people(credit, person_type: PersonType):
+    return Person(
+        persion_type= person_type,
+        ids={PROVIDER_ID: credit["id"]},
+        name= credit["name"],
+        role= credit["character"] if "character" in credit else None,
+        thumb_url=f"{_ARTWORK_BASE_URL}h632{credit['profile_path']}" if "profile_path" in credit else None,
+        profile_url=f"{_PROFILE_BASE_URL}{credit['id']}" if "id" in credit else None
+    )
+
+def _crew_filter(person_type: PersonType):
+    if person_type is PersonType.DIRECTOR:
+        credits_type = "crew"
+        filter_ = lambda c: "job" in c and c["job"] == "Director"
+    elif person_type is PersonType.WRITER:
+        credits_type = "crew"
+        filter_ = lambda c: "department" in c and c["department"] == "Writing"
+    elif person_type is PersonType.PRODUCER:
+        credits_type = "crew"
+        filter_ = lambda c: "department" in c and c["department"] == "Production"
+    else:
+        raise Exception(f"Unkonw PersonType {person_type}")
+
+    def _execute(crew):
+        data = crew
+        return [_conv_people(c, person_type) for c in data if filter_(c)]
+
+    return _execute
 
 def _credits_filter(person_type: PersonType):
     if person_type is PersonType.ACTOR:
@@ -249,18 +317,10 @@ def _credits_filter(person_type: PersonType):
     else:
         raise Exception(f"Unkonw PersonType {person_type}")
 
-    def _conv(credit):
-        return Person(
-            persion_type= person_type,
-            ids={PROVIDER_ID: credit["id"]},
-            name= credit["name"],
-            role= credit["character"] if "character" in credit else None,
-            thumb_url=f"{_ARTWORK_BASE_URL}h632{credit['profile_path']}" if "profile_path" in credit else None,
-            profile_url=f"{_PROFILE_BASE_URL}{credit['id']}" if "id" in credit else None
-        )
+
     def _execute(credits):
         data = credits[credits_type]
-        return [_conv(c) for c in data if filter_(c)]
+        return [_conv_people(c, person_type) for c in data if filter_(c)]
 
     return _execute
 

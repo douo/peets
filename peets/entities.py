@@ -612,26 +612,27 @@ class TvShow(MediaEntity):
     certification: MediaCertification = MediaCertification.UNKNOWN
     country: str = ""
     genres: list[MediaGenres] = field(default_factory=list)
-    season_title_map: dict[int, str] = field(default_factory=dict)
-    season_poster_url_map: dict[int, str] = field(default_factory=dict)
-    season_fanart_url_map: dict[int, str] = field(default_factory=dict)
-    season_banner_url_map: dict[int, str] = field(default_factory=dict)
-    season_thumb_url_map: dict[int, str] = field(default_factory=dict)
     actors: list[Person]  =  field(default_factory=list)
     dummy_episodes: list[TvShowEpisode] = field(default_factory=list)
     extra_fanart_urls: list[str] = field(default_factory=list)
     trailer: list[MediaTrailer] = field(default_factory=list)
     # 不用 dict 方便修改 season
     episodes: list[TvShowEpisode] = field(default_factory=list)
-    season_posters: dict[int, MediaFile] = field(default_factory=dict)
-    season_fanarts: dict[int, MediaFile] = field(default_factory=dict)
-    season_banners: dict[int, MediaFile] = field(default_factory=dict)
-    season_thumbs: dict[int, MediaFile] = field(default_factory=dict)
+    seasons: list[TvShowSeason] = field(default_factory=list)
 
     def retrieve_episode(self, season: int, episode: int) -> "TvShowEpisode" | None:
         for e in self.episodes:
             if e.season == season and e.episode == episode:
                 return e
+
+@dataclass(kw_only=True)
+class TvShowSeason():
+    season: int = -1
+    air_date: str = ""  # date
+    episode_count: int = 0
+    name: str = ""
+    plot: str = ""
+    artwork_url_map: dict[MediaFileType, str] = field(default_factory=dict)
 
 
 @dataclass(kw_only=True)
