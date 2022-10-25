@@ -483,7 +483,7 @@ class MediaEntity:
     dbid: UUID = uuid4()
     locked: bool = False # ignore
     data_source: str = ""  #TODO 暂时没有 data_source 的概念，可以存放首次发现的目录？
-    ids: dict[str, str] = field(default_factory=dict)
+    ids: dict[str, str] = field(default_factory=dict) #TODO 通过 key 来选择 scrapper
     title: str = ""
     original_title: str = ""
     year: int = 0
