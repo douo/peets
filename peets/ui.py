@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Callable, get_type_hints
@@ -28,53 +29,84 @@ class Action(Enum):
     NEXT = 1
     QUIT = 3
 
+OpResult = MediaEntity | dict | Action
+OpCallable = Callable[[MediaEntity], OpResult]
+Op = tuple[str, OpCallable]
 
-
+R = TypeVar("R")
 T = TypeVar("T", bound=MediaEntity)
-Op = list[tuple[str, Callable]]
 
-class Ops(ABC, Generic[T]):
+
+class MediaUI(ABC, Generic[T]):
+    def __init__(self) -> None:
+        self.abc = "abc"
     @abstractmethod
-    def edit_ops(self, media: T) -> tuple[str, str, Callable]:
-        ...
+    def brief(self, media: T):
+        pass
+    @abstractmethod
+    def edit_ops(self, media: T) -> list[Op]:
+        pass
 
-class MovieOps(Ops[Movie]):
+_ui_maps: dict[str, MediaUI] = {}
+
+class MovieUI(MediaUI[Movie]):
+    def brief(self, media: Movie):
+        print(f"Type: {type(media).__name__}")
+        print(f"Title: {media.title}")
+        print(f"Year: {media.year}")
+        for k, v in media.ids.items():
+            print(f"{k}: {v}")
+        for mf in media.media_files:
+            print(f"{mf[0].name}: {mf[1]}")
+
     def edit_ops(self, media: Movie) -> list[tuple[str, str, Callable]]:
         return [("edit name", "n", partial(_modify, attr="title")),
                 ("edit year", "y", partial(_modify, attr="year"))]
 
-def interact(media: MediaEntity, lib_path: Path, naming_style: str):
-    brief(media)
-    ops = {
-        "lf": ("search", "enter", do_search),
-        "i": ("fetch by id", "i", do_fill),
-        "d": ("detail", "d", lambda media: pp.pprint(media.__dict__)),
-        "p": ("process", "p", partial(do_process, lib_path=lib_path, naming_style=naming_style)),
-        "j": ("skip", "j", Action.NEXT)
-    }
-    _hint(ops)
-    while sel := get_key() :
-        if _key_match(sel, ops.keys()):
-            result = ops[sel][2]
-            result = result(media) if isinstance(result, Callable) else result
+class TvShowUI(MediaUI[TvShow]):
+    def brief(self, media: TvShow):
+        print(f"Type: {type(media).__name__}")
+        print(f"Title: {media.title}")
+        print(f"Year: {media.year}")
+        for k, v in media.ids.items():
+            print(f"{k}: {v}")
+        for mf in media.media_files:
+            print(f"{mf[0].name}: {mf[1]}")
+        for e in media.episodes:
+            print(f"S{e.season:02d}E{e.episode:02d}")
+
+def interact(media: MediaEntity, lib_path: Path, naming_style: str) -> Action:
+    _brief(media)
+    ops = [
+        ("search", _search),
+        ("fetch by Id", do_fill),
+        ("edit...", do_edit),
+        ("view...", do_view),
+        ("detail", lambda media: pp.pprint(media.__dict__)),
+        ("process", partial(do_process, lib_path=lib_path, naming_style=naming_style)),
+        ("skip", Action.NEXT)]
+    ops = _parse_ops(ops)
+    while True:
+        try:
+            pick =  _hint(ops)
+            result = pick(media) if isinstance(pick, Callable) else pick
             match result:
                 case MediaEntity():
                     media = result
-                    brief(media)
+                    _brief(media)
                 case dict():
                     media = replace(media, **result)
-                    brief(media)
+                    _brief(media)
                 case Action.NEXT | Action.QUIT:
                     return result
-
-        elif sel in ("ctrl-c", "ctrl-z", "escape"):
+        except KeyboardInterrupt:
             return Action.QUIT
-        else:
-            pass
-        _hint(ops)
 
 
-def _parse_ops(ops):
+def _parse_ops(ops:list[Op]) -> list[ChoiceHelper[OpCallable]]:
+    return _to_choices(ops)
+
+def _to_choices(ops:list[tuple[str, R]]) -> list[ChoiceHelper[R]]:
     '''
     1. 选择快捷键，按 op 顺序应用如下优先级：
      - 第一个大写字母
@@ -85,28 +117,48 @@ def _parse_ops(ops):
     '''
     ...
 
-    def _fisrt_upper(s) -> str | None:
+    def _first_key(s) -> str:
         try:
             return next(c for c in s if c.isupper())
         except StopIteration:
-            return None
-
+            return next(c for c in s if c.isalpha())
     keys = []
     for op in ops:
         dsc = op[0]
+        best = _first_key(dsc).lower()
+        if best not in keys:
+            keys.append(best)
+            continue
+        else:
+            # 第一个  alpha 可能被比较两次
+            try:
+                keys.append(next(c for c in dsc if c.isalpha() and c not in keys))
+                continue
+            except StopIteration:
+                pass
+        # 字母表顺序
+        for i in range(ord(best)+1, ord('z')+1):
+            c = chr(i)
+            if c not in keys:
+                keys.append(c)
+                break
 
-        _c = _fisrt_upper(dsc)
-        best = _c if _c else dsc[]
-        if c:=_fisrt_upper(dsc)
-          if c not in keys:
-            keys.append(c)
+    return [ChoiceHelper(v[1], label= v[0], mnemonic_style=["green", "bold", "underline"], mnemonic=k)
+            for k,v in zip(keys, ops)]
 
 
 
+def _hint(ops: list[ChoiceHelper]):
+    width = os.get_terminal_size().columns
+    label = "Action"
+    padding = 1
+    margin = 0
+    leading = int((width - len(label))/2 - padding - margin)
+    header = " " * margin + "=" * leading + " " * padding + label + " " * padding + "=" * leading  + " " * margin
+    print()
+    print(header)
 
-def _hint(ops):
-    style_print(", ".join([f"{label} ({key})" for label, key, _ in ops.values()]),
-                                style=["green", "bold"])
+    return SelectOne(ops).prompt()
 
 def _modify(media: T, attr: str) -> T:
     promt = "".join(ele.title() for ele in attr.split('_'))
@@ -121,18 +173,9 @@ def do_edit(media:T) -> T:
     }
     return media
 
-def brief(media: MediaEntity):
-    print(f"Type: {type(media).__name__}")
-    print(f"Title: {media.title}")
-    print(f"Year: {media.year}")
-    for k, v in media.ids.items():
-        print(f"{k}: {v}")
-    for mf in media.media_files:
-        print(f"{mf[0].name}: {mf[1]}")
-
-    if isinstance(media, TvShow):
-        for e in media.episodes:
-            print(f"S{e.season:02d}E{e.episode:02d}")
+def _brief(media: MediaEntity):
+    ui = _ui_maps[type(media).__name__]
+    ui.brief(media)
 
 def do_fill(media: T) -> T:
     id_  = style_input("tmdb id:", style=["blue", "bold"])
@@ -141,9 +184,16 @@ def do_fill(media: T) -> T:
     scraper = artwork(media)
     return scraper.apply(new_)
 
-def do_search(media: MediaEntity):
-    print("Searching...")
-    scraper = metadata(media)
+def _search(media: MediaEntity):
+    scrapers = metadata(media)
+    if len(scrapers) >1:
+        choices = [ChoiceHelper(
+            s,
+            label= f"{s.title} - {s.year} - {s.rank}({s.id_})",
+            style="bold"
+        ) for s in scrapers]
+
+
     result = scraper.search(media)
     if result:
         choices = [ChoiceHelper(

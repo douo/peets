@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-from peets.entities import Movie
+from peets.entities import MediaEntity, Movie
 from peets.finder import traverse
 from peets.guessit import NonMedia, create_entity
 from peets.ui import interact, Action
@@ -20,7 +20,7 @@ def main():
     parser.add_argument('targets', type=Path, nargs='+')
     args = parser.parse_args()
     media_files = traverse(*args.targets)
-    media_set:Iterator[Movie] = (e for e in (create_entity(f)
+    media_set:Iterator[MediaEntity] = (e for e in (create_entity(f)
                                             for f in chain(*map(traverse, args.targets))
                                              )
                                  if not isinstance(e, NonMedia))

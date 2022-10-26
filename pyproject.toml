@@ -13,7 +13,7 @@ dependencies = [
     "tmdbsimple == 2.9.1",
     "reflink == 0.2.1",
     "guessit",
-    "teletype",
+    "teletype @ git+https://github.com/douo/teletype.git@master",
     "python-dateutil"
 ]
 

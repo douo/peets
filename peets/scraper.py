@@ -55,16 +55,15 @@ def register(*p: Provider):
     global providers
     providers += p
 
-def metadata(media: T) -> MetadataProvider[T]:
+def metadata(media: T) -> list[MetadataProvider[T]]:
     global providers
-    return next(
-        p for p in providers
+    return [p for p in providers
         if p.is_available(media) and isinstance(p, MetadataProvider)
-    )
+    ]
 
-def artwork(media: T) -> Provider[T]:
+def artwork(media: T) -> list[Provider[T]]:
     global providers
-    return next(
+    return [
         p for p in providers
         if p.is_available(media) and Feature.Artwork in p.features()
-    )
+    ]
