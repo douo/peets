@@ -29,3 +29,9 @@ profile = 'black'
 
 [tool.pylint.format]
 max-line-length = "88"
+
+# https://github.com/python-lsp/pylsp-mypy
+[tool.pylsp-mypy]
+enabled = true
+live_mode = true
+strict = false
