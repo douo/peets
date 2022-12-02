@@ -8,12 +8,11 @@ from dataclasses import replace as data_replace
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Callable, get_type_hints
+from typing import Any, Callable, Generic, TypeVar, get_type_hints
 
 import requests
 from teletype.components import ChoiceHelper, SelectOne
 from teletype.io import style_input
-from typing_inspect import Generic, TypeVar
 
 import peets.naming as naming
 from peets.entities import MediaEntity, MediaFileType, Movie, TvShow
@@ -23,8 +22,6 @@ from peets.scraper import artwork, metadata
 
 pp = pprint.PrettyPrinter(indent=2)
 
-test: str = 1
-
 
 class Action(Enum):
     # NO_ACTION = 0
@@ -32,18 +29,17 @@ class Action(Enum):
     QUIT = 3
 
 
-OpResult = MediaEntity | dict | Action
-OpCallable = Callable[[MediaEntity], OpResult]
-Op = tuple[str, OpCallable]
+OpResult = MediaEntity | dict | Action | None
 
+OpCallable = Callable[[MediaEntity], OpResult]
+
+Op = tuple[str, OpCallable | OpResult]
 R = TypeVar("R")
+
 T = TypeVar("T", bound=MediaEntity)
 
 
 class MediaUI(ABC, Generic[T]):
-    def __init__(self) -> None:
-        self.abc = "abc"
-
     @abstractmethod
     def brief(self, media: T):
         pass
@@ -66,10 +62,10 @@ class MovieUI(MediaUI[Movie]):
         for mf in media.media_files:
             print(f"{mf[0].name}: {mf[1]}")
 
-    def edit_ops(self, media: Movie) -> list[tuple[str, str, Callable]]:
+    def edit_ops(self, media: Movie) -> list[Op]:
         return [
-            ("edit name", "n", partial(_modify, attr="title")),
-            ("edit year", "y", partial(_modify, attr="year")),
+            ("edit name", partial(_modify, attr="title")),
+            ("edit year", partial(_modify, attr="year")),
         ]
 
 
@@ -88,20 +84,25 @@ class TvShowUI(MediaUI[TvShow]):
 
 def interact(media: MediaEntity, lib_path: Path, naming_style: str) -> Action:
     _brief(media)
-    ops = [
-        ("search", _search),
-        ("fetch by Id", do_fill),
-        ("edit...", do_edit),
-        ("view...", do_view),
-        ("detail", lambda media: pp.pprint(media.__dict__)),
-        ("process", partial(do_process, lib_path=lib_path, naming_style=naming_style)),
-        ("skip", Action.NEXT),
-    ]
-    ops = _parse_ops(ops)
+
+    ops = _parse_ops(
+        [
+            ("search", _search),
+            ("fetch by Id", do_fill),
+            ("edit...", do_edit),
+            ("view...", do_view),
+            ("detail", lambda media: pp.pprint(media.__dict__)),
+            (
+                "process",
+                partial(do_process, lib_path=lib_path, naming_style=naming_style),
+            ),
+            ("skip", Action.NEXT),
+        ]
+    )
     while True:
         try:
             pick = _hint(ops)
-            result = pick(media) if isinstance(pick, Callable) else pick
+            result = pick(media) if callable(pick) else pick
             match result:
                 case MediaEntity():
                     media = result
@@ -111,11 +112,14 @@ def interact(media: MediaEntity, lib_path: Path, naming_style: str) -> Action:
                     _brief(media)
                 case Action.NEXT | Action.QUIT:
                     return result
+                case _:
+                    _brief(media)
+
         except KeyboardInterrupt:
             return Action.QUIT
 
 
-def _parse_ops(ops: list[Op]) -> list[ChoiceHelper[OpCallable]]:
+def _parse_ops(ops: list[Op]) -> list[ChoiceHelper[OpCallable | OpResult]]:
     return _to_choices(ops)
 
 
@@ -165,7 +169,7 @@ def _to_choices(ops: list[tuple[str, R]]) -> list[ChoiceHelper[R]]:
     ]
 
 
-def _hint(ops: list[ChoiceHelper]):
+def _hint(ops: list[ChoiceHelper]) -> Any:
     width = os.get_terminal_size().columns
     label = "Action"
     padding = 1
@@ -195,8 +199,12 @@ def _modify(media: T, attr: str) -> T:
 
 
 def do_edit(media: T) -> T:
-    ops = {}
+    # ops = {}
     return media
+
+
+def do_view(media: T) -> T:
+    pass
 
 
 def _brief(media: MediaEntity):
@@ -276,4 +284,5 @@ def _download_to_tmp(url) -> str:
                 f.write(chunk)
 
     print(f"save to {f.name}")
+    return f.name
     return f.name
