@@ -1,17 +1,19 @@
 import json
-import os
 import sys
 
-import tmdbsimple
-from peets.entities import (MediaAiredStatus, MediaCertification,
-                            MediaFileType, MediaGenres, Movie, MovieSet,
-                            TvShow, TvShowEpisode)
-from peets.iso import Country, Language
-from peets.nfo import generate_nfo
-from peets.tmdb import TmdbArtworkProvider, TmdbMovieMetadata
 from pytest import fixture
-from util import datadir
-from contextlib import contextmanager
+
+from peets.entities import (
+    MediaAiredStatus,
+    MediaCertification,
+    MediaFileType,
+    MediaGenres,
+    Movie,
+    TvShow,
+    TvShowEpisode,
+)
+from peets.iso import Country, Language
+from peets.tmdb import TmdbArtworkProvider, TmdbMovieMetadata
 
 
 def test_detail(hijack):
@@ -99,14 +101,15 @@ def test_tvshow(hijack):
 
 
 @fixture
-def hijack(datadir, monkeypatch, request):
-    '''
+def hijack(data_path, monkeypatch, request):
+    """
     包装了 monkeypatch fixture，方便用文件内容替换掉函数返回
-    '''
+    """
+
     def parse(path):
-        '''
+        """
         将 tmdbsimple.base.TMDB._GET 转换为 (tmdbsimple.base.TMDB, '_GET')（类引用，'方法名'）
-        '''
+        """
         end = len(path)
         while True:
             try:
@@ -127,17 +130,18 @@ def hijack(datadir, monkeypatch, request):
             return (pre, refs[-1])
 
     with monkeypatch.context() as m:
+
         def mock(name: str, path="tmdbsimple.base.TMDB._GET"):
-            '''
+            """
             将文件内容作为函数的返回
 
             @name str: 文件名
             @path str: 函数路径
-            '''
-            with open(f"{datadir}/{name}") as f:
+            """
+            with open(f"{data_path}/{name}") as f:
                 data = json.load(f)
             clazz, func = parse(path)
             m.setattr(clazz, func, lambda *x: data)
             return data
-        yield mock
 
+        yield mock

@@ -1,9 +1,15 @@
+from dataclasses import dataclass, field
+
 import pytest
 
-from dataclasses import dataclass, field
-from typing import get_type_hints
-
-from peets.merger import FieldNotExistError, MapTable, to_kwargs, replace, UnexceptType, create
+from peets.merger import (
+    FieldNotExistError,
+    MapTable,
+    UnexceptType,
+    create,
+    replace,
+    to_kwargs,
+)
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -14,8 +20,9 @@ class People:
     age: int | None = None
     # parent:tuple["People", "People"]
     pets: list[str] = field(default_factory=list)
-    tools: dict[str,int] =  field(default_factory=dict)
+    tools: dict[str, int] = field(default_factory=dict)
     pair: tuple[int, str] = (0, "0")
+
 
 @dataclass(kw_only=True, frozen=True)
 class Department:
@@ -26,77 +33,64 @@ class Department:
 
 
 def test_to_kwargs():
-    addon = {
-        "name" : "Demo",
-        "year" : 20,
-        "demo" : "something else"
-    }
+    addon = {"name": "Demo", "year": 20, "demo": "something else"}
 
-    assert to_kwargs(People, addon) == {
-        "name": "Demo"
-    }
+    assert to_kwargs(People, addon) == {"name": "Demo"}
 
     addon = {
-        "name" : "Demo",
-        "title" : "Worker",
-        "level" : -1,
-        "age" : 20,
-        "pets" : ["dog"],
-        "tools" : {"pen": 1}
+        "name": "Demo",
+        "title": "Worker",
+        "level": -1,
+        "age": 20,
+        "pets": ["dog"],
+        "tools": {"pen": 1},
     }
 
     assert to_kwargs(People, addon) == addon
 
     addon = {
-        "account" : "Demo",
-        "age" : "30",
-        "pet1" : "dog",
-        "pet2" : "cat",
-        "title" : "Worker,2",
-        "tools" : {"pen": 1},
-        "test" : (1, "3")
+        "account": "Demo",
+        "age": "30",
+        "pet1": "dog",
+        "pet2": "cat",
+        "title": "Worker,2",
+        "tools": {"pen": 1},
+        "test": (1, "3"),
     }
 
     # table 的结构
     # addon key nanme, target field name, converter
     # 支持多对一，一对多的转换， converter 的数量需要与 target field 一一对应，converter 的参数与 key name 一一对应
     # (addon key nanme,...), (target field name,...), (converter,...)
-    map_table = [("account", "name"), # 变量名转换， converter 省略表示直接赋值
-                 ("age", "age", lambda age: int(age)), # converter
-                 (("pet1","pet2"), "pets", lambda p1,p2: [p1,p2]),
-                 ("title", ("title", "level"),
-                  (None, lambda title: int(title.split(',')[-1])) # converter 为 None 表示直接转换
-                  ),
-                 ("test", "pair")
-                 ]
+    map_table = [
+        ("account", "name"),  # 变量名转换， converter 省略表示直接赋值
+        ("age", "age", lambda age: int(age)),  # converter
+        (("pet1", "pet2"), "pets", lambda p1, p2: [p1, p2]),
+        (
+            "title",
+            ("title", "level"),
+            (None, lambda title: int(title.split(",")[-1])),  # converter 为 None 表示直接转换
+        ),
+        ("test", "pair"),
+    ]
 
     assert to_kwargs(People, addon, map_table) == {
-        "name" : "Demo",
-        "title" : "Worker,2",
-        "level" : 2,
-        "age" : 30,
-        "pets" : ["dog", "cat"],
-        "tools" : {"pen": 1},
-        "pair" : (1, "3")
+        "name": "Demo",
+        "title": "Worker,2",
+        "level": 2,
+        "age": 30,
+        "pets": ["dog", "cat"],
+        "tools": {"pen": 1},
+        "pair": (1, "3"),
     }
 
     # 如果已经在 map_table 定义过的 key ，不会再自动赋值到同名字段
-    addon = {
-        "name" : "Name",
-        "age" : 30,
-        "title" : "Worker",
-        "level" : 2
-    }
-    assert to_kwargs(People, addon, [
-        (("title", "level"),
-         "title",
-         lambda title, level: f"{title},{level}")
-    ]) == {
-        "name" : "Name",
-        "age" : 30,
-        "title" : "Worker,2"
-    }
-
+    addon = {"name": "Name", "age": 30, "title": "Worker", "level": 2}
+    assert to_kwargs(
+        People,
+        addon,
+        [(("title", "level"), "title", lambda title, level: f"{title},{level}")],
+    ) == {"name": "Name", "age": 30, "title": "Worker,2"}
 
 
 def test_to_kwargs_collections():
@@ -104,40 +98,34 @@ def test_to_kwargs_collections():
     # addon 对应类型是 item 或 key-value tuple
     # 会自动添加到原先的集合中
     addon = {
-        "name" : "Name",
-        "pets" : "dog",
-        "pet2" : "cat",
-        "tools" : ("pen", 1),
-        "other-tools": ("disc", 10)
+        "name": "Name",
+        "pets": "dog",
+        "pet2": "cat",
+        "tools": ("pen", 1),
+        "other-tools": ("disc", 10),
     }
 
     assert to_kwargs(People, addon) == {
-        "name" : "Name",
-        "pets" : ["dog"],
-        "tools" : {"pen": 1}
+        "name": "Name",
+        "pets": ["dog"],
+        "tools": {"pen": 1},
     }
 
-    assert to_kwargs(People, addon, [
-        ("pet2", "pets"),
-        ("other-tools", "tools")
-    ]) == {
-        "name" : "Name",
-        "pets" : ["cat", "dog"], # map_table 中的 key 优先处理
-        "tools" : {"pen": 1, "disc" : 10}
+    assert to_kwargs(People, addon, [("pet2", "pets"), ("other-tools", "tools")]) == {
+        "name": "Name",
+        "pets": ["cat", "dog"],  # map_table 中的 key 优先处理
+        "tools": {"pen": 1, "disc": 10},
     }
+
 
 def test_to_kwargs_empty_addon():
-    addon = {
-    }
+    addon = {}
 
     assert to_kwargs(People, addon) == {}
 
 
 def test_tokwargs_field_not_exist():
-    addon = {
-        "name" : "Name",
-        "pets" : [1,2]
-    }
+    addon = {"name": "Name", "pets": [1, 2]}
 
     with pytest.raises(FieldNotExistError):
         to_kwargs(People, addon, [("pets", "not_exist")])
@@ -145,101 +133,67 @@ def test_tokwargs_field_not_exist():
     # map_table 定义的 key 在 addon 不存在
     # 参数为 None 传入 map
     # TODO 是否改为不执行 map
-    assert to_kwargs(People, {"name" : "Name"}, [("not_exist", "pets", lambda p: "" if p else "1")]) == {
-        "name" : "Name",
-        "pets" : ["1"]
-    }
+    assert to_kwargs(
+        People, {"name": "Name"}, [("not_exist", "pets", lambda p: "" if p else "1")]
+    ) == {"name": "Name", "pets": ["1"]}
 
 
 def test_to_kwargs_type_not_match():
     addon = {
-        "name" : "Demo",
-        "age" : "abc",
+        "name": "Demo",
+        "age": "abc",
     }
 
     with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
 
-
-    addon = {
-        "name" : "Demo",
-        "pets" : 1
-    }
+    addon = {"name": "Demo", "pets": 1}
 
     with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
 
-    addon = {
-        "name" : "Demo",
-        "tools" : (1,1)
-    }
+    addon = {"name": "Demo", "tools": (1, 1)}
 
     with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
-
 
     # 对集合类也同样适用
-    addon = {
-        "name" : "Demo",
-        "pets" : [1,2,3]
-    }
+    addon = {"name": "Demo", "pets": [1, 2, 3]}
 
     with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
 
-    addon = {
-        "name" : "Demo",
-        "tools" : {1:1}
-    }
+    addon = {"name": "Demo", "tools": {1: 1}}
 
     with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
-
 
     # 混合类型的集合会检查所有项
 
-    addon = {
-        "name" : "Demo",
-        "pets" : ["dog", 2, "cat"]
-    }
+    addon = {"name": "Demo", "pets": ["dog", 2, "cat"]}
 
     with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
 
-    addon = {
-        "name" : "Demo",
-        "tools" : {"pen": 1, 3: "disc"}
-    }
+    addon = {"name": "Demo", "tools": {"pen": 1, 3: "disc"}}
 
     with pytest.raises(UnexceptType):
         to_kwargs(People, addon)
+
 
 def test_to_kwargs_nested_map_table():
 
     addon = {
         "department": "Demo",
-        "bigman": {
-            "name": "Demo",
-            "pets": ["dog", "cat"],
-            "label": "M"
-        },
+        "bigman": {"name": "Demo", "pets": ["dog", "cat"], "label": "M"},
         "worker": [
             {
                 "name": "W1",
-                "pets": "dog" ,
+                "pets": "dog",
             },
-            {
-                "name": "W2",
-                "label": "L",
-                "tools": {"pen": 1}
-            }
+            {"name": "W2", "label": "L", "tools": {"pen": 1}},
         ],
-        "position": {
-            1: {
-                "name": "p1",
-                "label": "P"
-            }
-        }
+        "position": {1: {"name": "p1", "label": "P"}},
     }
 
     people_table: MapTable = [("label", "title")]
@@ -247,75 +201,45 @@ def test_to_kwargs_nested_map_table():
     table: MapTable = [
         ("department", "name"),
         ("bigman", "manager", people_table),
-        ("worker", "employee", people_table)
+        ("worker", "employee", people_table),
     ]
 
     assert to_kwargs(Department, addon, table) == {
         "name": "Demo",
-        "manager": {
-            "name": "Demo",
-            "title": "M",
-            "pets": ["dog", "cat"]
-        },
+        "manager": {"name": "Demo", "title": "M", "pets": ["dog", "cat"]},
         "employee": [
-            {
-                "name": "W1",
-                "title": None,
-                "pets": ["dog"]
-            },
-            {
-                "name": "W2",
-                "title": "L",
-                "tools": {"pen": 1}
-            }
+            {"name": "W1", "title": None, "pets": ["dog"]},
+            {"name": "W2", "title": "L", "tools": {"pen": 1}},
         ],
         "position": {
             1: {
                 "name": "p1",
             }
-        }
+        },
     }
 
 
-
 def test_create():
-    kwargs_ =  {
-        "name" : "Demo",
-        "title" : "Worker",
-        "level" : -1,
-        "age" : 20,
-        "pets" : ["dog"],
-        "tools" : {"pen": 1},
-        "pair" : (1, "1")
+    kwargs_ = {
+        "name": "Demo",
+        "title": "Worker",
+        "level": -1,
+        "age": 20,
+        "pets": ["dog"],
+        "tools": {"pen": 1},
+        "pair": (1, "1"),
     }
 
     assert create(People, kwargs_).__dict__ == kwargs_
 
-
     kwargs_ = {
         "name": "Demo",
-        "manager": {
-            "name": "Demo",
-            "pets": ["dog", "cat"]
-        },
+        "manager": {"name": "Demo", "pets": ["dog", "cat"]},
         "employee": [
-            {
-                "name": "W1",
-                "title": None,
-                "pets": ["dog"]
-            },
-            {
-                "name": "W2",
-                "title": "L",
-                "tools": {"pen": 1}
-            }
+            {"name": "W1", "title": None, "pets": ["dog"]},
+            {"name": "W2", "title": "L", "tools": {"pen": 1}},
         ],
-        "position": {
-            1: {
-                "name": "P1",
-                "title": "P"
-            }
-        }
+        "position": {1: {"name": "P1", "title": "P"}},
     }
 
     dep = create(Department, kwargs_)
@@ -329,26 +253,12 @@ def test_create():
 
     kwargs_ = {
         "name": "Demo",
-        "manager": People(
-            name= "Demo",
-            pets= ["dog", "cat"]
-        ),
+        "manager": People(name="Demo", pets=["dog", "cat"]),
         "employee": [
-            People(
-                name= "W1",
-                pets= ["dog"]
-            ),
-            People(
-                name= "W2",
-                title= "L",
-                tools= {"pen": 1}
-            )
+            People(name="W1", pets=["dog"]),
+            People(name="W2", title="L", tools={"pen": 1}),
         ],
-        "position": {
-            1: People(
-                name= "P1",
-                title= "P")
-        }
+        "position": {1: People(name="P1", title="P")},
     }
 
     dep = create(Department, kwargs_)
@@ -360,15 +270,16 @@ def test_create():
     for i, e in enumerate(dep.employee):
         assert e.name == kwargs_["employee"][i].name
 
+
 def test_replace():
     p = People(name="Hello", level=1)
 
-    kwargs_ =  {
-        "name" : "Demo",
-        "title" : "Worker",
-        "age" : 20,
-        "pets" : ["dog"],
-        "tools" : {"pen": 1}
+    kwargs_ = {
+        "name": "Demo",
+        "title": "Worker",
+        "age": 20,
+        "pets": ["dog"],
+        "tools": {"pen": 1},
     }
 
     n_p = replace(p, kwargs_)
@@ -380,37 +291,21 @@ def test_replace():
     assert n_p.tools == kwargs_["tools"]
     assert n_p.level == p.level
 
-
-    dep = Department(name="name",
-                     manager=People(name="m", title="m", level=5),
-                     employee= [People(name="w", title="w", level=1)],
-                     position={1 : People(name="p")}
-                     )
+    dep = Department(
+        name="name",
+        manager=People(name="m", title="m", level=5),
+        employee=[People(name="w", title="w", level=1)],
+        position={1: People(name="p")},
+    )
 
     kwargs_ = {
         "name": "Demo",
-        "manager": {
-            "name": "Demo",
-            "pets": ["dog", "cat"]
-        },
+        "manager": {"name": "Demo", "pets": ["dog", "cat"]},
         "employee": [
-            {
-                "name": "W1",
-                "title": None,
-                "pets": ["dog"]
-            },
-            {
-                "name": "W2",
-                "title": "L",
-                "tools": {"pen": 1}
-            }
+            {"name": "W1", "title": None, "pets": ["dog"]},
+            {"name": "W2", "title": "L", "tools": {"pen": 1}},
         ],
-        "position": {
-            1: {
-                "name": "P1",
-                "title": "P"
-            }
-        }
+        "position": {1: {"name": "P1", "title": "P"}},
     }
 
     n_dep = replace(dep, kwargs_)
