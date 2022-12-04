@@ -23,6 +23,9 @@ tests = [
   'pytest'
 ]
 
+[tool.setuptools]
+zip-safe = false #  force setuptools to always install the project as a directory. required by mypy(#7508)
+
 [tool.isort]
 profile = 'black'
 
