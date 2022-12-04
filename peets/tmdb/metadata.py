@@ -32,6 +32,7 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
         self.fallback_country = Country.US.name
         self.fallback_lan = "en-us"
 
+    @property
     def available_type(self) -> list[str]:
         return ["movie", "tvshow"]
 

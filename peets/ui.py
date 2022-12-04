@@ -49,9 +49,6 @@ class MediaUI(ABC, Generic[T]):
         pass
 
 
-_ui_maps: dict[str, MediaUI] = {}
-
-
 class MovieUI(MediaUI[Movie]):
     def brief(self, media: Movie):
         print(f"Type: {type(media).__name__}")
@@ -80,6 +77,15 @@ class TvShowUI(MediaUI[TvShow]):
             print(f"{mf[0].name}: {mf[1]}")
         for e in media.episodes:
             print(f"S{e.season:02d}E{e.episode:02d}")
+
+    def edit_ops(self, media: TvShow) -> list[Op]:
+        return [
+            ("edit name", partial(_modify, attr="title")),
+            ("edit year", partial(_modify, attr="year")),
+        ]
+
+
+_ui_maps: dict[str, MediaUI] = {"Movie": MovieUI(), "TvShow": TvShowUI()}
 
 
 def interact(media: MediaEntity, lib_path: Path, naming_style: str) -> Action:
@@ -229,6 +235,9 @@ def _search(media: MediaEntity):
             )
             for s in scrapers
         ]
+        scraper = SelectOne(choices).prompt()
+    else:
+        scraper = scrapers[0]
 
     result = scraper.search(media)
     if result:
@@ -241,7 +250,7 @@ def _search(media: MediaEntity):
         pick = SelectOne(choices).prompt()
         print("Fetching...")
         new_ = scraper.apply(media, id_=pick.id_)
-        scraper = artwork(media)
+        scraper = artwork(media)[0] # FIXME 如何挑选 artwork scraper
         return scraper.apply(new_)
     else:
         print("Not Found!")
@@ -263,7 +272,7 @@ def do_process(media: MediaEntity, lib_path: Path, naming_style: str):
 
         parsed.append((MediaFileType.NFO, Path(f.name)))
     media = data_replace(media, media_files=media.media_files + parsed)
-    brief(media)
+    _brief(media)
     naming.do_copy(media, lib_path, naming_style)
     return Action.NEXT
 

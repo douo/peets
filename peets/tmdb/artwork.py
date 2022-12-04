@@ -44,8 +44,10 @@ class TmdbArtworkProvider(Provider[MediaEntity]):
 
         return replace(media, {"artwork_url_map": result})
 
+    @property
     def available_type(self) -> list[str]:
         return ["movie", "episode"]
 
+    @property
     def features(self) -> list[Feature]:
         return [Feature.Artwork]
