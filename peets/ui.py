@@ -4,6 +4,7 @@ import os
 import pprint
 import tempfile
 from abc import ABC, abstractmethod
+from dataclasses import Field, fields
 from dataclasses import replace as data_replace
 from enum import Enum
 from functools import partial
@@ -18,7 +19,7 @@ import peets.naming as naming
 from peets.entities import MediaEntity, MediaFileType, Movie, TvShow
 from peets.merger import replace
 from peets.nfo import generate_nfo
-from peets.scraper import artwork, metadata
+from peets.scraper import MetadataProvider, Provider, artwork, metadata
 
 pp = pprint.PrettyPrinter(indent=2)
 
@@ -93,11 +94,10 @@ def interact(media: MediaEntity, lib_path: Path, naming_style: str) -> Action:
 
     ops = _parse_ops(
         [
-            ("search", _search),
+            ("search", do_search),
             ("fetch by Id", do_fill),
             ("edit...", do_edit),
             ("view...", do_view),
-            ("detail", lambda media: pp.pprint(media.__dict__)),
             (
                 "process",
                 partial(do_process, lib_path=lib_path, naming_style=naming_style),
@@ -107,7 +107,7 @@ def interact(media: MediaEntity, lib_path: Path, naming_style: str) -> Action:
     )
     while True:
         try:
-            pick = _hint(ops)
+            pick = _hint(ops, "Action")
             result = pick(media) if callable(pick) else pick
             match result:
                 case MediaEntity():
@@ -161,11 +161,16 @@ def _to_choices(ops: list[tuple[str, R]]) -> list[ChoiceHelper[R]]:
             except StopIteration:
                 pass
         # 字母表顺序
+        found = False
         for i in range(ord(best) + 1, ord("z") + 1):
             c = chr(i)
             if c not in keys:
                 keys.append(c)
+                found = True
                 break
+        # 找不到的占位符
+        if not found:
+            keys.append(" ")
 
     return [
         ChoiceHelper(
@@ -175,9 +180,8 @@ def _to_choices(ops: list[tuple[str, R]]) -> list[ChoiceHelper[R]]:
     ]
 
 
-def _hint(ops: list[ChoiceHelper]) -> Any:
+def _hint(ops: list[ChoiceHelper], label: str) -> Any:
     width = os.get_terminal_size().columns
-    label = "Action"
     padding = 1
     margin = 0
     leading = int((width - len(label)) / 2 - padding - margin)
@@ -210,7 +214,36 @@ def do_edit(media: T) -> T:
 
 
 def do_view(media: T) -> T:
-    pass
+    ops = _parse_ops(
+        [
+            ("brief", _brief),
+            ("detail", lambda media: pp.pprint(media.__dict__)),
+            ("view by Field", _view_by_field),
+            ("back", None),
+        ]
+    )
+    result = None
+    while not result:
+        pick = _hint(ops, "View")
+        result = pick(media) if callable(pick) else pick
+
+
+def _view_by_field(media: T):
+    fs = fields(media)
+
+    def _print_field(media: T, attr: Field):
+        # TODO 检查是否是 MediaEntity 的子类或集合
+        print(str(getattr(media, attr)))
+
+    ops = _parse_ops(
+        [(f.name, partial(_print_field, attr=f)) for f in fs] + [("Back", Action.QUIT)]
+    )
+
+    result = None
+    while result != Action.QUIT:
+        pick = _hint(ops, "View by Field")
+        breakpoint()
+        result = pick(media) if callable(pick) else pick
 
 
 def _brief(media: MediaEntity):
@@ -218,27 +251,34 @@ def _brief(media: MediaEntity):
     ui.brief(media)
 
 
+def _pick_metadata_scraper(media: T) -> MetadataProvider[T]:
+    scrapers = metadata(media)
+    if len(scrapers) > 1:
+        choices = [ChoiceHelper(s, label=f"{type(s)}", style="bold") for s in scrapers]
+        return SelectOne(choices).prompt()
+    else:
+        return scrapers[0]
+
+
+def _pick_artwork_scraper(media: T) -> Provider[T]:
+    scrapers = artwork(media)
+    if len(scrapers) > 1:
+        choices = [ChoiceHelper(s, label=f"{type(s)}", style="bold") for s in scrapers]
+        return SelectOne(choices).prompt()
+    else:
+        return scrapers[0]
+
+
 def do_fill(media: T) -> T:
-    id_ = style_input("tmdb id:", style=["blue", "bold"])
-    scraper = metadata(media)
+    scraper = _pick_metadata_scraper(media)
+    id_ = style_input(f"{type(scraper)} id:", style=["blue", "bold"])
     new_ = scraper.apply(media, id_=int(id_))
-    scraper = artwork(media)
+    scraper = _pick_metadata_scraper(media)
     return scraper.apply(new_)
 
 
-def _search(media: MediaEntity):
-    scrapers = metadata(media)
-    if len(scrapers) > 1:
-        choices = [
-            ChoiceHelper(
-                s, label=f"{s.title} - {s.year} - {s.rank}({s.id_})", style="bold"
-            )
-            for s in scrapers
-        ]
-        scraper = SelectOne(choices).prompt()
-    else:
-        scraper = scrapers[0]
-
+def do_search(media: MediaEntity):
+    scraper = _pick_metadata_scraper(media)
     result = scraper.search(media)
     if result:
         choices = [
@@ -250,7 +290,7 @@ def _search(media: MediaEntity):
         pick = SelectOne(choices).prompt()
         print("Fetching...")
         new_ = scraper.apply(media, id_=pick.id_)
-        scraper = artwork(media)[0] # FIXME 如何挑选 artwork scraper
+        scraper = _pick_metadata_scraper(media)
         return scraper.apply(new_)
     else:
         print("Not Found!")
@@ -292,6 +332,9 @@ def _download_to_tmp(url) -> str:
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
 
+    print(f"save to {f.name}")
+    return f.name
+    return f.name
     print(f"save to {f.name}")
     return f.name
     return f.name
