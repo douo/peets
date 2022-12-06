@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import os
 import pprint
+import readline
 import tempfile
 from abc import ABC, abstractmethod
-from dataclasses import Field, fields
 from dataclasses import replace as data_replace
 from enum import Enum
 from functools import partial
@@ -13,7 +13,7 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, get_type_hints
 
 import requests
 from teletype.components import ChoiceHelper, SelectOne
-from teletype.io import style_input
+from teletype.io import style_input, get_key
 
 import peets.naming as naming
 from peets.entities import MediaEntity, MediaFileType, Movie, TvShow
@@ -203,6 +203,7 @@ def _hint(ops: list[ChoiceHelper], label: str) -> Any:
 
 def _modify(media: T, attr: str) -> T:
     promt = "".join(ele.title() for ele in attr.split("_"))
+    readline.set_startup_hook(lambda: readline.insert_text(str(getattr(media, attr))))
     value = style_input(f"{promt}:", style=["blue", "bold"])
     # FIXME
     type_ = get_type_hints(type(media))[attr]
@@ -211,69 +212,81 @@ def _modify(media: T, attr: str) -> T:
 
 def do_edit(media: T) -> T:
     ui = _ui_maps[type(media).__name__]
-    _select(ui.edit_ops()+[("edit by Field", _edit_by_field)], "Edit")
-    return media
+    return _select(media, ui.edit_ops() + [("edit by Field", _edit_by_field)], "Edit")
 
-def _edit_by_field(media: T):
-    def _type_filter(type_: type)-> bool:
+
+def _edit_by_field(media: T) -> T:
+    def _type_filter(type_: type) -> bool:
         return type_ in [bool, int, float, str]
 
-    fs=[for f in fields(media) if _type_filter(type_)]
+    fs = [f for f in get_type_hints(type(media)).items() if _type_filter(f[1])]
 
-    def _edit_field(media: T, attr: Field):
+    def _edit_field(media: T, attr: Field) -> T:
         # TODO 检查是否是 MediaEntity 的子类或集合
-        type_ = attr.type
-        value = getattr(media, attr.name)
+        type_ = attr[1]
+        value = getattr(media, attr[0])
         if is_assignable(type_, MediaEntity):
-            do_edit(value)
+            return do_edit(value)
         elif is_assignable(type_, Iterable) and check_iterable_type(value, MediaEntity):
-            _select([(m.title, do_view) for m in value], "Select Media")
+            return _select([(m.title, do_view) for m in value], "Select Media")
         else:
-            _modify(media, attr.name)
+            return _modify(media, attr[0])
 
-    _select([(f.name, partial(_print_field, attr=f)) for f in fs], "View by Field")
+    return _select(
+        media, [(f[0], partial(_edit_field, attr=f)) for f in fs], "View by Field"
+    )
 
 
-
-def do_view(media: T) -> T:
-    _select([
+def do_view(media: T):
+    _select(
+        media,
+        [
             ("brief", _brief),
             ("detail", lambda media: pp.pprint(media.__dict__)),
-            ("view by Field", _view_by_field)
-        ], "View")
+            ("view by Field", _view_by_field),
+        ],
+        "View",
+    )
 
 
 def _view_by_field(media: T):
-    def _type_filter(type_: type)-> bool:
+    def _type_filter(type_: type) -> bool:
         return type_ in [bool, int, float, str, list, dict, tuple]
 
-    fs=[for f in fields(media) if _type_filter(type_)]
+    fs = [f for f in get_type_hints(type(media)).items() if _type_filter(f[1])]
 
-    def _print_field(media: T, attr: Field):
+    def _print_field(media: T, attr: tuple[str, type]):
         # TODO 检查是否是 MediaEntity 的子类或集合
-        type_ = attr.type
-        value = getattr(media, attr.name)
+        type_ = attr[1]
+        value = getattr(media, attr[0])
         if is_assignable(type_, MediaEntity):
             do_view(value)
         elif is_assignable(type_, Iterable) and check_iterable_type(value, MediaEntity):
             _select([(m.title, do_view) for m in value], "Select Media")
         else:
-            print(str(value))
+            print(f'{attr[0]}: {value}')
+            get_key()
 
-    _select([(f.name, partial(_print_field, attr=f)) for f in fs], "View by Field")
-
-
-def _select(ops: list[Op], label: str) :
-    '''
-    生成一个可返回的选择菜单
-    '''
-    ops_ = _parse_ops(
-        ops + [("Back", Action.QUIT)]
+    _select(
+        media, [(f[0], partial(_print_field, attr=f)) for f in fs], "View by Field"
     )
-    result = None
-    while result != Action.QUIT:
+
+
+def _select(media: T, ops: list[Op], label: str) -> T:
+    """
+    生成一个可返回的选择菜单
+    """
+    ops_ = _parse_ops(ops + [("Back", Action.QUIT)])
+    while True:
         pick = _hint(ops_, label)
         result = pick(media) if callable(pick) else pick
+        match result:
+            case MediaEntity():
+                media = result
+            case dict():
+                media = replace(media, **result)
+            case Action.QUIT:
+                return media
 
 
 def _brief(media: MediaEntity):

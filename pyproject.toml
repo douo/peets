@@ -14,6 +14,7 @@ dependencies = [
     "reflink == 0.2.1",
     "guessit",
     "teletype @ git+https://github.com/douo/teletype.git@master",
+    "readline"
     "python-dateutil"
 ]
 
