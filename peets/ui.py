@@ -9,7 +9,7 @@ from dataclasses import replace as data_replace
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Generic, TypeVar, get_type_hints
+from typing import Any, Callable, Generic, Iterable, TypeVar, get_type_hints
 
 import requests
 from teletype.components import ChoiceHelper, SelectOne
@@ -20,6 +20,7 @@ from peets.entities import MediaEntity, MediaFileType, Movie, TvShow
 from peets.merger import replace
 from peets.nfo import generate_nfo
 from peets.scraper import MetadataProvider, Provider, artwork, metadata
+from peets.util.type_utils import check_iterable_type, is_assignable
 
 pp = pprint.PrettyPrinter(indent=2)
 
@@ -46,7 +47,7 @@ class MediaUI(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def edit_ops(self, media: T) -> list[Op]:
+    def edit_ops(self) -> list[Op]:
         pass
 
 
@@ -60,7 +61,7 @@ class MovieUI(MediaUI[Movie]):
         for mf in media.media_files:
             print(f"{mf[0].name}: {mf[1]}")
 
-    def edit_ops(self, media: Movie) -> list[Op]:
+    def edit_ops(self) -> list[Op]:
         return [
             ("edit name", partial(_modify, attr="title")),
             ("edit year", partial(_modify, attr="year")),
@@ -79,7 +80,7 @@ class TvShowUI(MediaUI[TvShow]):
         for e in media.episodes:
             print(f"S{e.season:02d}E{e.episode:02d}")
 
-    def edit_ops(self, media: TvShow) -> list[Op]:
+    def edit_ops(self) -> list[Op]:
         return [
             ("edit name", partial(_modify, attr="title")),
             ("edit year", partial(_modify, attr="year")),
@@ -209,40 +210,69 @@ def _modify(media: T, attr: str) -> T:
 
 
 def do_edit(media: T) -> T:
-    # ops = {}
+    ui = _ui_maps[type(media).__name__]
+    _select(ui.edit_ops()+[("edit by Field", _edit_by_field)], "Edit")
     return media
+
+def _edit_by_field(media: T):
+    def _type_filter(type_: type)-> bool:
+        return type_ in [bool, int, float, str]
+
+    fs=[for f in fields(media) if _type_filter(type_)]
+
+    def _edit_field(media: T, attr: Field):
+        # TODO 检查是否是 MediaEntity 的子类或集合
+        type_ = attr.type
+        value = getattr(media, attr.name)
+        if is_assignable(type_, MediaEntity):
+            do_edit(value)
+        elif is_assignable(type_, Iterable) and check_iterable_type(value, MediaEntity):
+            _select([(m.title, do_view) for m in value], "Select Media")
+        else:
+            _modify(media, attr.name)
+
+    _select([(f.name, partial(_print_field, attr=f)) for f in fs], "View by Field")
+
 
 
 def do_view(media: T) -> T:
-    ops = _parse_ops(
-        [
+    _select([
             ("brief", _brief),
             ("detail", lambda media: pp.pprint(media.__dict__)),
-            ("view by Field", _view_by_field),
-            ("back", None),
-        ]
-    )
-    result = None
-    while not result:
-        pick = _hint(ops, "View")
-        result = pick(media) if callable(pick) else pick
+            ("view by Field", _view_by_field)
+        ], "View")
 
 
 def _view_by_field(media: T):
-    fs = fields(media)
+    def _type_filter(type_: type)-> bool:
+        return type_ in [bool, int, float, str, list, dict, tuple]
+
+    fs=[for f in fields(media) if _type_filter(type_)]
 
     def _print_field(media: T, attr: Field):
         # TODO 检查是否是 MediaEntity 的子类或集合
-        print(str(getattr(media, attr)))
+        type_ = attr.type
+        value = getattr(media, attr.name)
+        if is_assignable(type_, MediaEntity):
+            do_view(value)
+        elif is_assignable(type_, Iterable) and check_iterable_type(value, MediaEntity):
+            _select([(m.title, do_view) for m in value], "Select Media")
+        else:
+            print(str(value))
 
-    ops = _parse_ops(
-        [(f.name, partial(_print_field, attr=f)) for f in fs] + [("Back", Action.QUIT)]
+    _select([(f.name, partial(_print_field, attr=f)) for f in fs], "View by Field")
+
+
+def _select(ops: list[Op], label: str) :
+    '''
+    生成一个可返回的选择菜单
+    '''
+    ops_ = _parse_ops(
+        ops + [("Back", Action.QUIT)]
     )
-
     result = None
     while result != Action.QUIT:
-        pick = _hint(ops, "View by Field")
-        breakpoint()
+        pick = _hint(ops_, label)
         result = pick(media) if callable(pick) else pick
 
 

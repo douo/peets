@@ -1,16 +1,11 @@
 from abc import ABCMeta, abstractmethod
 from dataclasses import replace as data_replace
 from itertools import chain
-from types import NoneType, UnionType
 from typing import (
     Any,
     Callable,
-    Generic,
-    Iterable,
     Protocol,
-    Sequence,
     Tuple,
-    Type,
     TypeAlias,
     TypeGuard,
     TypeVar,
@@ -20,15 +15,9 @@ from typing import (
     runtime_checkable,
 )
 
-from typing_inspect import (
-    get_args,
-    get_origin,
-    is_generic_type,
-    is_tuple_type,
-    is_union_type,
-)
+from typing_inspect import get_args, get_origin, is_union_type
 
-from peets.entities import MediaEntity
+from peets.util.type_utils import check_dict_type, check_iterable_type, is_assignable
 
 
 class UnexceptType(Exception):
@@ -66,6 +55,7 @@ MapTableItem: TypeAlias = (
     tuple[str | tuple[str, ...], str | tuple[str, ...], MapTableConverter]
     | tuple[str | tuple[str, ...], str | tuple[str, ...]]
 )
+
 MapTable: TypeAlias = list[MapTableItem]
 
 
@@ -96,38 +86,6 @@ def _make_sure_table(map_table: MapTable) -> StictMapTable:
     )  # type: ignore
 
 
-def _is_assignable(v_type: type, f_type: type) -> bool:
-    """
-    检查类型是否能赋值给目标类型
-    """
-    # print(f"{v_type}/{f_type}")
-    return (
-        f_type is Any
-        or  # 任何值都可以赋予 Any
-        # 因为类型擦除，运行时无法区分 List[str] 和 List[int]，
-        # get_origin(f_type) is v_type or
-        (v_type is tuple and is_tuple_type(f_type))
-        or not is_generic_type(f_type)
-        and issubclass(v_type, f_type)
-    )
-
-
-def _check_dict_type(
-    dict_: dict, target: tuple[type[T], type[R]]
-) -> TypeGuard[dict[T, R]]:
-    return all(
-        _is_assignable(type(k), target[0]) and _is_assignable(type(v), target[1])
-        for k, v in dict_.items()
-    )
-
-
-def _check_iterable_type(iter_: Iterable, target: type[T]) -> TypeGuard[Iterable[T]]:
-    """
-    检查集合中的类型都是目标类型
-    """
-    return all(_is_assignable(type(x), target) for x in iter_)
-
-
 def _get_mergeable(type_: type) -> Mergeable | None:
     if isinstance(type_, Mergeable):
         return type_
@@ -151,13 +109,13 @@ def _sanity_kwargs(target: Mergeable, kwargs_: dict) -> dict:
         elif (
             get_origin(f_type) is list
             and (f_item_type := _get_mergeable(f_type.__args__[0]))
-            and _check_iterable_type(v, dict)
+            and check_iterable_type(v, dict)
         ):
             return [create(f_item_type, v_item) for v_item in v]
         elif (
             get_origin(f_type) is dict
             and (f_value_type := _get_mergeable(f_type.__args__[1]))
-            and _check_iterable_type(v.values(), dict)
+            and check_iterable_type(v.values(), dict)
         ):
             return {
                 v_key: create(f_value_type, v_value) for v_key, v_value in v.items()
@@ -218,7 +176,7 @@ def to_kwargs(type_: Any, addon: dict[str, Any], table: MapTable | None = None) 
                 conv(*params) if conv and isinstance(conv, Callable) else params[0]
             )  #  converter 非 Callable 直接取值
             v_type = type(v)
-            if _is_assignable(v_type, f_type):
+            if is_assignable(v_type, f_type):
                 result[attr] = v
             elif (f_item_type := _get_mergeable(f_type)) and v_type is dict:
                 if _map_table_guard(conv):
@@ -230,11 +188,11 @@ def to_kwargs(type_: Any, addon: dict[str, Any], table: MapTable | None = None) 
                 f_item_type = f_type.__args__[0]
                 if v_type is list:
                     v = cast(list, v)
-                    if _check_iterable_type(v, f_item_type):
+                    if check_iterable_type(v, f_item_type):
                         old += v
                     elif (
                         f_item_mergeable_type := _get_mergeable(f_item_type)
-                    ) and _check_iterable_type(v, dict):
+                    ) and check_iterable_type(v, dict):
                         if _map_table_guard(conv):
                             v = cast(list[dict[str, Any]], v)
                             old += [
@@ -244,7 +202,7 @@ def to_kwargs(type_: Any, addon: dict[str, Any], table: MapTable | None = None) 
                         raise UnexceptType(
                             f"Get Type {v_type}, except {attr} type is {f_type}"
                         )
-                elif _is_assignable(v_type, f_item_type):
+                elif is_assignable(v_type, f_item_type):
                     old.append(v)
                 elif (
                     f_item_mergeable_type := _get_mergeable(f_item_type)
@@ -266,12 +224,12 @@ def to_kwargs(type_: Any, addon: dict[str, Any], table: MapTable | None = None) 
                 f_value_type = f_type.__args__[1]
                 if isinstance(v, dict):
                     # v_type 与 f_type 键值类型都匹配
-                    if _check_dict_type(v, cast(tuple[Any, Any], get_args(f_type))):
+                    if check_dict_type(v, cast(tuple[Any, Any], get_args(f_type))):
                         old |= v
                     elif (
                         (f_value_mergeable_type := _get_mergeable(f_value_type))
-                        and _check_iterable_type(v.keys(), f_key_type)
-                        and _check_iterable_type(v.values(), dict)
+                        and check_iterable_type(v.keys(), f_key_type)
+                        and check_iterable_type(v.values(), dict)
                     ):  # 只对 value 进行处理
                         if _map_table_guard(conv):
                             v = cast(dict[f_key_type, dict[str, Any]], v)
@@ -284,14 +242,14 @@ def to_kwargs(type_: Any, addon: dict[str, Any], table: MapTable | None = None) 
                             f"Get Type {v_type}, except {attr} type is {f_type}"
                         )
                 elif isinstance(v, tuple):
-                    if _is_assignable(type(v[0]), f_key_type) and _is_assignable(
+                    if is_assignable(type(v[0]), f_key_type) and is_assignable(
                         type(v[1]), f_value_type
                     ):  # FIXME 没类型推定？
                         old.__setitem__(*v)
                     elif (
                         (f_value_mergeable_type := _get_mergeable(f_value_type))
-                        and _is_assignable(type(v[0]), f_key_type)
-                        and _is_assignable(type(v[1]), dict[str, Any])
+                        and is_assignable(type(v[0]), f_key_type)
+                        and is_assignable(type(v[1]), dict[str, Any])
                     ):
                         if _map_table_guard(conv):
                             v = cast(tuple[f_key_type, dict[str, Any]], v)
