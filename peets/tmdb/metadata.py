@@ -1,32 +1,37 @@
 from __future__ import annotations
-from abc import ABC
+
 import dataclasses
-from datetime import datetime
-from functools import partial, singledispatchmethod
 import itertools
+from datetime import datetime
+from functools import singledispatchmethod
 from typing import TypeVar
-from dateutil.parser import isoparse
-from typing_extensions import TypeAlias
-from tmdbsimple.movies import Movies
-from peets.entities import MediaCertification, MediaEntity, Movie, MediaFileType, MediaRating, MediaGenres, MediaArtwork, MediaArtworkType, MovieSet, Person, PersonType, TvShow, MediaAiredStatus
-from peets.merger import MapTable, replace, to_kwargs
-from peets.iso import Language, Country
-from peets.scraper import Feature, MetadataProvider, Provider, SearchResult
+
 import tmdbsimple as tmdb
-from .config import PROVIDER_ID, _ARTWORK_BASE_URL, _PROFILE_BASE_URL
+from dateutil.parser import isoparse
+
+from peets.entities import (MediaAiredStatus, MediaArtwork, MediaCertification,
+                            MediaFileType, MediaGenres, MediaRating, Movie,
+                            MovieSet, Person, PersonType, TvShow)
+from peets.iso import Country, Language
+from peets.merger import MapTable, replace
+from peets.scraper import MetadataProvider, Provider, SearchResult
+
+from .config import _ARTWORK_BASE_URL, _PROFILE_BASE_URL, PROVIDER_ID
 
 
 class TmdbMovieMetadata(MetadataProvider[Movie]):
-    T = TypeVar('T', Movie, TvShow)
-    def __init__(self,
-                 language: Language,
-                 country: Country,
-                 include_adult: bool = True,
-                 ) -> None:
+    T = TypeVar("T", Movie, TvShow)
+
+    def __init__(
+        self,
+        language: Language,
+        country: Country,
+        include_adult: bool = True,
+    ) -> None:
         super().__init__()
 
         self.language = f"{language.name}-{country.name}".lower()
-        self.country =  country.name
+        self.country = country.name
         self.include_adult = include_adult
 
         self.fallback_country = Country.US.name
@@ -44,109 +49,199 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
     def apply(self, media: T, **kwargs) -> T:
         raise NotImplementedError()
 
-
     @search.register
     def _(self, movie: Movie) -> list[SearchResult]:
         api = tmdb.Search()
         resp = api.movie(
             language=self.language,
-            query = movie.title,
-            include_adult = self.include_adult,
-            year = movie.year,
+            query=movie.title,
+            include_adult=self.include_adult,
+            year=movie.year,
         )
-        return [SearchResult(d["id"], d["title"], "tmdb",  d["release_date"], d["popularity"]) for d in api.results]
+        return [
+            SearchResult(
+                d["id"], d["title"], "tmdb", d["release_date"], d["popularity"]
+            )
+            for d in api.results
+        ]
 
     @apply.register
     def _(self, movie: Movie, **kwargs) -> Movie:
-        m_id = kwargs['id_']
+        m_id = kwargs["id_"]
         api = tmdb.Movies(m_id)
         context = api.info(
-            language=self.language,
-            append_to_response="credits,keywords,release_dates"
+            language=self.language, append_to_response="credits,keywords,release_dates"
         )
 
         table: MapTable = [
-            ("imdb_id","ids", lambda id_: ("imdb", str(id_))), # dict 类型的返回 (key value)
-            ("id","ids", lambda id_: (PROVIDER_ID, str(id_))),
+            (
+                "imdb_id",
+                "ids",
+                lambda id_: ("imdb", str(id_)),
+            ),  # dict 类型的返回 (key value)
+            ("id", "ids", lambda id_: (PROVIDER_ID, str(id_))),
             ("overview", "plot"),
-            (("vote_average", "vote_count"),
-             "ratings",
-             lambda va, vc : (PROVIDER_ID, MediaRating(rating_id = "tmdb", rating=va, votes=vc))
-             ),
-            (("poster_path", "id"), "artwork_url_map",  #TODO artwork 应该另外处理？
-             lambda path, id_: (MediaFileType.POSTER, f"{_ARTWORK_BASE_URL}original{path}")
-             # MediaArtwork(
-             #     provider_id=PROVIDER_ID,
-             #     artwork_type=MediaArtworkType.POSTER,
-             #     preview_url=f"{artwork_base_url}w342{path}",
-             #     default_url=f"{artwork_base_url}original{path}",
-             #     original_url=f"{artwork_base_url}original{path}",
-             #     language=language,
-             #     tmdbId=id_
-             ), # 列表类型，返回单项表示插入？？
-            ("spoken_languages","spoken_languages",
-             lambda spoken_languages: ", ".join([lang["iso_639_1"] for lang in spoken_languages])),
-            ("production_countries", "country",
-             lambda production_countries: ", ".join([country["iso_3166_1"] for country in production_countries])),
-            ("production_companies", "production_company",
-             lambda production_companies: ", ".join([company["name"] for company in production_companies])),
+            (
+                ("vote_average", "vote_count"),
+                "ratings",
+                lambda va, vc: (
+                    PROVIDER_ID,
+                    MediaRating(rating_id="tmdb", rating=va, votes=vc),
+                ),
+            ),
+            (
+                ("poster_path", "id"),
+                "artwork_url_map",  # TODO artwork 应该另外处理？
+                lambda path, id_: (
+                    MediaFileType.POSTER,
+                    f"{_ARTWORK_BASE_URL}original{path}",
+                )
+                # MediaArtwork(
+                #     provider_id=PROVIDER_ID,
+                #     artwork_type=MediaArtworkType.POSTER,
+                #     preview_url=f"{artwork_base_url}w342{path}",
+                #     default_url=f"{artwork_base_url}original{path}",
+                #     original_url=f"{artwork_base_url}original{path}",
+                #     language=language,
+                #     tmdbId=id_
+            ),  # 列表类型，返回单项表示插入？？
+            (
+                "spoken_languages",
+                "spoken_languages",
+                lambda spoken_languages: ", ".join(
+                    [lang["iso_639_1"] for lang in spoken_languages]
+                ),
+            ),
+            (
+                "production_countries",
+                "country",
+                lambda production_countries: ", ".join(
+                    [country["iso_3166_1"] for country in production_countries]
+                ),
+            ),
+            (
+                "production_companies",
+                "production_company",
+                lambda production_companies: ", ".join(
+                    [company["name"] for company in production_companies]
+                ),
+            ),
             # 一对多的情况下，支持通过 tuple 指定
             # 转换函数表示默认赋值
-            ("release_date", "year", lambda release_date: datetime.strptime(release_date, "%Y-%m-%d").year),
-            (("release_dates", "production_countries"), "release_date", lambda release_dates, production_countries: self._parse_release_date(release_dates, production_countries)),
-            (("release_dates", "production_countries"), "certification", lambda release_dates, production_countries: self._parse_certification(release_dates, production_countries)),
-            #credits TODO partition
-            ("credits", ("actors", "producers", "directors", "writers"),
-             (_credits_filter(PersonType.ACTOR), _credits_filter(PersonType.PRODUCER), _credits_filter(PersonType.DIRECTOR), _credits_filter(PersonType.WRITER))),
-            #genres
+            (
+                "release_date",
+                "year",
+                lambda release_date: datetime.strptime(release_date, "%Y-%m-%d").year,
+            ),
+            (
+                ("release_dates", "production_countries"),
+                "release_date",
+                lambda release_dates, production_countries: self._parse_release_date(
+                    release_dates, production_countries
+                ),
+            ),
+            (
+                ("release_dates", "production_countries"),
+                "certification",
+                lambda release_dates, production_countries: self._parse_certification(
+                    release_dates, production_countries
+                ),
+            ),
+            # credits TODO partition
+            (
+                "credits",
+                ("actors", "producers", "directors", "writers"),
+                (
+                    _credits_filter(PersonType.ACTOR),
+                    _credits_filter(PersonType.PRODUCER),
+                    _credits_filter(PersonType.DIRECTOR),
+                    _credits_filter(PersonType.WRITER),
+                ),
+            ),
+            # genres
             ("genres", "genres", lambda genres: [_to_genre(g) for g in genres]),
             ("adult", "genres", lambda adult: MediaGenres.EROTIC if adult else []),
-            ("belongs_to_collection", ("movie_set", "ids"),
-             ((lambda data: MovieSet(name = data["name"], tmdb_id = data["id"]) if data else None),
-             (lambda data: ("tmdbSet", str(data["id"])) if data else {}))
-             ),
-            ("keywords", "tags", lambda keywords: [k["name"] for k in keywords["keywords"]])
+            (
+                "belongs_to_collection",
+                ("movie_set", "ids"),
+                (
+                    (
+                        lambda data: MovieSet(name=data["name"], tmdb_id=data["id"])
+                        if data
+                        else None
+                    ),
+                    (lambda data: ("tmdbSet", str(data["id"])) if data else {}),
+                ),
+            ),
+            (
+                "keywords",
+                "tags",
+                lambda keywords: [k["name"] for k in keywords["keywords"]],
+            ),
         ]
 
         return replace(movie, context, table)
-
-
 
     @search.register
     def _(self, tvshow: TvShow) -> list[SearchResult]:
         api = tmdb.Search()
         resp = api.tv(
             language=self.language,
-            query = tvshow.title,
-            include_adult = self.include_adult,
-            year = tvshow.year,
+            query=tvshow.title,
+            include_adult=self.include_adult,
+            year=tvshow.year,
         )
-        return [SearchResult(d["id"], d["name"], "tmdb", int(d["first_air_date"][0:4]), d["popularity"]) for d in api.results]
-
+        return [
+            SearchResult(
+                d["id"],
+                d["name"],
+                "tmdb",
+                int(d["first_air_date"][0:4]),
+                d["popularity"],
+            )
+            for d in api.results
+        ]
 
     @apply.register
     def _(self, tvshow: TvShow, **kwargs) -> TvShow:
-        m_id = kwargs['id_']
+        m_id = kwargs["id_"]
 
         episode_table: MapTable = [
             # TODO external ids 需要调用 episode api
-            ("id","ids", lambda id_: (PROVIDER_ID, str(id_))),
+            ("id", "ids", lambda id_: (PROVIDER_ID, str(id_))),
             ("season_number", "season"),
             ("episode_number", "episode"),
             ("name", "title"),
             ("overview", "plot"),
-            (("vote_average", "vote_count"),
-             "ratings",
-             lambda va, vc : (PROVIDER_ID, MediaRating(rating_id = "tmdb", rating=va, votes=vc))
-             ),
+            (
+                ("vote_average", "vote_count"),
+                "ratings",
+                lambda va, vc: (
+                    PROVIDER_ID,
+                    MediaRating(rating_id="tmdb", rating=va, votes=vc),
+                ),
+            ),
             ("air_date", "first_aired"),
-            ("crew", ("directors", "writers"),
-             (_crew_filter(PersonType.DIRECTOR), _crew_filter(PersonType.WRITER))),
-            ("guest_stars",
-             "actors",
-             lambda guest_starts: [_conv_people(c, PersonType.ACTOR) for c in guest_starts]),
-            (("still_path", "id"), "artwork_url_map",  #TODO artwork 应该另外处理？
-             lambda path, id_: (MediaFileType.THUMB, f"{_ARTWORK_BASE_URL}original{path}"))
+            (
+                "crew",
+                ("directors", "writers"),
+                (_crew_filter(PersonType.DIRECTOR), _crew_filter(PersonType.WRITER)),
+            ),
+            (
+                "guest_stars",
+                "actors",
+                lambda guest_starts: [
+                    _conv_people(c, PersonType.ACTOR) for c in guest_starts
+                ],
+            ),
+            (
+                ("still_path", "id"),
+                "artwork_url_map",  # TODO artwork 应该另外处理？
+                lambda path, id_: (
+                    MediaFileType.THUMB,
+                    f"{_ARTWORK_BASE_URL}original{path}",
+                ),
+            ),
         ]
         episodes = []
         for key, group in itertools.groupby(tvshow.episodes, lambda e: e.season):
@@ -158,130 +253,202 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
         api = tmdb.TV(m_id)
         tv_context = api.info(
             language=self.language,
-            append_to_response="credits, external_ids, content_ratings, keywords"
+            append_to_response="credits, external_ids, content_ratings, keywords",
         )
-
-
+        print(tv_context)
         season_table: MapTable = [
             ("overview", "plot"),
             ("season_number", "season"),
-            ("poster_path",
-             "artwork_url_map",  #TODO artwork 应该另外处理？
-             lambda path: (MediaFileType.POSTER, f"{_ARTWORK_BASE_URL}original{path}"))
+            (
+                "poster_path",
+                "artwork_url_map",  # TODO artwork 应该另外处理？
+                lambda path: (
+                    MediaFileType.POSTER,
+                    f"{_ARTWORK_BASE_URL}original{path}",
+                ),
+            ),
         ]
         # lambda 表达式语法太繁琐
         table: MapTable = [
-            ("id","ids", lambda id_: (PROVIDER_ID, str(id_))),
+            ("id", "ids", lambda id_: (PROVIDER_ID, str(id_))),
             ("name", "title"),
             ("first_air_date", "first_aired"),
             ("overview", "plot"),
-            (("vote_average", "vote_count"),
-             "ratings",
-             lambda va, vc : (PROVIDER_ID, MediaRating(rating_id = "tmdb", rating=va, votes=vc))
-             ),
-            ("origin_country", "country", lambda origin_country: ", ".join(origin_country)),
-            ("episode_run_time", "runtime", lambda episode_run_time: episode_run_time[0] if episode_run_time else 0),
-            (("poster_path", "id"), "artwork_url_map",  #TODO artwork 应该另外处理？
-             lambda path, id_: (MediaFileType.POSTER, f"{_ARTWORK_BASE_URL}original{path}")),
-            (("networks", "production_companies"),
-             "production_company",
-             lambda networks, production_companies: ", ".join([n['name'] for n in networks] + [c['name'] for c in production_companies])
-             ),
-            ("status", "status", lambda status: MediaAiredStatus.retrieve_status(status)),
-            ("first_air_date", "year", lambda release_date: datetime.strptime(release_date, "%Y-%m-%d").year),
+            (
+                ("vote_average", "vote_count"),
+                "ratings",
+                lambda va, vc: (
+                    PROVIDER_ID,
+                    MediaRating(rating_id="tmdb", rating=va, votes=vc),
+                ),
+            ),
+            (
+                "origin_country",
+                "country",
+                lambda origin_country: ", ".join(origin_country),
+            ),
+            (
+                "episode_run_time",
+                "runtime",
+                lambda episode_run_time: episode_run_time[0] if episode_run_time else 0,
+            ),
+            (
+                ("poster_path", "id"),
+                "artwork_url_map",  # TODO artwork 应该另外处理？
+                lambda path, id_: (
+                    MediaFileType.POSTER,
+                    f"{_ARTWORK_BASE_URL}original{path}",
+                ),
+            ),
+            (
+                ("networks", "production_companies"),
+                "production_company",
+                lambda networks, production_companies: ", ".join(
+                    [n["name"] for n in networks]
+                    + [c["name"] for c in production_companies]
+                ),
+            ),
+            (
+                "status",
+                "status",
+                lambda status: MediaAiredStatus.retrieve_status(status),
+            ),
+            (
+                "first_air_date",
+                "year",
+                lambda release_date: datetime.strptime(release_date, "%Y-%m-%d").year,
+            ),
             ("credits", "actors", _credits_filter(PersonType.ACTOR)),
-            ("external_ids", "ids", lambda id_: ("imdb", id_["imdb_id"])),
-            ("external_ids", "ids", lambda id_: ("tvdb", str(id_["tvdb_id"]))),
-            (("content_ratings", "production_countries"), "certification", lambda content_ratings, production_countries: self._parse_content_rating(content_ratings, production_countries)),
+            (
+                "external_ids",
+                "ids",
+                lambda id_: ("imdb", id_["imdb_id"] if id_ else '')
+            ),
+            (
+                "external_ids",
+                "ids",
+                lambda id_: ("tvdb", str(id_["tvdb_id"]) if id_ else '')
+            ),
+            (
+                ("content_ratings", "production_countries"),
+                "certification",
+                lambda content_ratings, production_countries: self._parse_content_rating(
+                    content_ratings, production_countries
+                ),
+            ),
             ("genres", "genres", lambda genres: [_to_genre(g) for g in genres]),
             ("adult", "genres", lambda adult: MediaGenres.EROTIC if adult else []),
-            ("keywords", "tags", lambda keywords: [k["name"] for k in keywords["results"]]),
-            ("seasons", "seasons", season_table)
+            (
+                "keywords",
+                "tags",
+                lambda keywords: [k["name"] for k in keywords["results"]],
+            ),
+            ("seasons", "seasons", season_table),
         ]
 
         tvshow = replace(tvshow, tv_context, table)
-        return dataclasses.replace(tvshow, episodes = episodes)
+        return dataclasses.replace(tvshow, episodes=episodes)
 
     # 按本地化、US、原始发行国的顺序取值
     def _parse_release_date(self, release_dates, production_countries) -> str:
         countries = [self.country, self.fallback_country]
-        countries += [v["iso_3166_1"] for v in production_countries if v["iso_3166_1"] not in countries]
+        countries += [
+            v["iso_3166_1"]
+            for v in production_countries
+            if v["iso_3166_1"] not in countries
+        ]
         data = _find_release_dates(release_dates, countries)
 
         for c in countries:
             if c in data:
                 items = data[c]
                 for item in items:
-                    if v:= item["release_date"]:
+                    if v := item["release_date"]:
                         return isoparse(v).strftime("%Y-%m-%d")
 
         return ""
 
-
     # 按本地化、US、原始发行国的顺序取值
-    def _parse_certification(self, release_dates, production_countries) -> MediaCertification:
+    def _parse_certification(
+        self, release_dates, production_countries
+    ) -> MediaCertification:
         countries = [self.country, self.fallback_country]
-        countries += [v["iso_3166_1"] for v in production_countries if v["iso_3166_1"] not in countries]
+        countries += [
+            v["iso_3166_1"]
+            for v in production_countries
+            if v["iso_3166_1"] not in countries
+        ]
         data = _find_release_dates(release_dates, countries)
 
         for c in countries:
             if c in data:
                 items = data[c]
                 for item in items:
-                    if cert:= item["certification"]:
+                    if cert := item["certification"]:
                         return MediaCertification.retrieve(cert, c)
 
         return MediaCertification.UNKNOWN
 
     # 按本地化、US、原始发行国的顺序取值
-    def _parse_content_rating(self, content_ratings, production_countries) -> MediaCertification:
+    def _parse_content_rating(
+        self, content_ratings, production_countries
+    ) -> MediaCertification:
         countries = [self.country, self.fallback_country]
-        countries += [v["iso_3166_1"] for v in production_countries if v["iso_3166_1"] not in countries]
-        #FIXME content_rating 与 movie 的 release_dates 结构类似
+        countries += [
+            v["iso_3166_1"]
+            for v in production_countries
+            if v["iso_3166_1"] not in countries
+        ]
+        # FIXME content_rating 与 movie 的 release_dates 结构类似
         data = _find_ratings(content_ratings, countries)
 
         for c in countries:
             if c in data:
                 item = data[c]
                 # FIXME 就 key 不一样
-                if cert:= item["rating"]:
+                if cert := item["rating"]:
                     return MediaCertification.retrieve(cert, c)
 
         return MediaCertification.UNKNOWN
 
 
-
 def _find_ratings(ratings, countries):
     result = {}
-    release_dates = ratings["results"]
-    for data in release_dates:
-        if (c:= data["iso_3166_1"]) in countries:
-            result[c] = data
-            if len(result) == len(countries):
-                break
+    if ratings and countries:
+        release_dates = ratings["results"]
+        for data in release_dates:
+            if (c := data["iso_3166_1"]) in countries:
+                result[c] = data
+                if len(result) == len(countries):
+                    break
 
     return result
+
 
 def _find_release_dates(release_dates, countries):
     result = {}
     release_dates = release_dates["results"]
     for data in release_dates:
-        if (c:= data["iso_3166_1"]) in countries:
-            result[c] = data['release_dates']
+        if (c := data["iso_3166_1"]) in countries:
+            result[c] = data["release_dates"]
             if len(result) == len(countries):
                 break
 
     return result
 
+
 def _conv_people(credit, person_type: PersonType):
     return Person(
-        persion_type= person_type,
+        persion_type=person_type,
         ids={PROVIDER_ID: credit["id"]},
-        name= credit["name"],
-        role= credit["character"] if "character" in credit else None,
-        thumb_url=f"{_ARTWORK_BASE_URL}h632{credit['profile_path']}" if "profile_path" in credit else None,
-        profile_url=f"{_PROFILE_BASE_URL}{credit['id']}" if "id" in credit else None
+        name=credit["name"],
+        role=credit["character"] if "character" in credit else None,
+        thumb_url=f"{_ARTWORK_BASE_URL}h632{credit['profile_path']}"
+        if "profile_path" in credit
+        else None,
+        profile_url=f"{_PROFILE_BASE_URL}{credit['id']}" if "id" in credit else None,
     )
+
 
 def _crew_filter(person_type: PersonType):
     if person_type is PersonType.DIRECTOR:
@@ -302,6 +469,7 @@ def _crew_filter(person_type: PersonType):
 
     return _execute
 
+
 def _credits_filter(person_type: PersonType):
     if person_type is PersonType.ACTOR:
         credits_type = "cast"
@@ -318,12 +486,12 @@ def _credits_filter(person_type: PersonType):
     else:
         raise Exception(f"Unkonw PersonType {person_type}")
 
-
     def _execute(credits):
         data = credits[credits_type]
         return [_conv_people(c, person_type) for c in data if filter_(c)]
 
     return _execute
+
 
 def _to_genre(tmdb_genre):
     match int(tmdb_genre["id"]):
@@ -403,5 +571,5 @@ def _to_genre(tmdb_genre):
             return MediaGenres.WAR
         case 37:
             return MediaGenres.WESTERN
-        case _: # 能自动创建枚举外的类型
+        case _:  # 能自动创建枚举外的类型
             return tmdb_genre

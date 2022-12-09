@@ -13,10 +13,10 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, get_type_hints
 
 import requests
 from teletype.components import ChoiceHelper, SelectOne
-from teletype.io import style_input, get_key
+from teletype.io import get_key, style_input
 
 import peets.naming as naming
-from peets.entities import MediaEntity, MediaFileType, Movie, TvShow
+from peets.entities import MediaEntity, MediaFileType, Movie, TvShow, TvShowEpisode
 from peets.merger import replace
 from peets.nfo import generate_nfo
 from peets.scraper import MetadataProvider, Provider, artwork, metadata
@@ -73,18 +73,32 @@ class TvShowUI(MediaUI[TvShow]):
         print(f"Type: {type(media).__name__}")
         print(f"Title: {media.title}")
         print(f"Year: {media.year}")
+
         for k, v in media.ids.items():
             print(f"{k}: {v}")
         for mf in media.media_files:
             print(f"{mf[0].name}: {mf[1]}")
         for e in media.episodes:
             print(f"S{e.season:02d}E{e.episode:02d}")
+            for mf in e.media_files:
+                print(f"{mf[0].name}: {mf[1]}")
 
     def edit_ops(self) -> list[Op]:
         return [
             ("edit name", partial(_modify, attr="title")),
             ("edit year", partial(_modify, attr="year")),
         ]
+
+
+class TvShowEpisodeUI(MediaUI[TvShowEpisode]):
+    def brief(self, media: TvShowEpisode):
+        print(f"Type: {type(media).__name__}")
+        print(f"Title: {media.title}")
+        print(f"Episode: {media.episode}")
+        print(f"Season: {media.season}")
+
+    def edit_ops(self) -> list[Op]:
+        return []
 
 
 _ui_maps: dict[str, MediaUI] = {"Movie": MovieUI(), "TvShow": TvShowUI()}
@@ -204,7 +218,10 @@ def _hint(ops: list[ChoiceHelper], label: str) -> Any:
 def _modify(media: T, attr: str) -> T:
     promt = "".join(ele.title() for ele in attr.split("_"))
     readline.set_startup_hook(lambda: readline.insert_text(str(getattr(media, attr))))
-    value = style_input(f"{promt}:", style=["blue", "bold"])
+    try:
+        value = style_input(f"{promt}:", style=["blue", "bold"])
+    finally:
+        readline.set_startup_hook()
     # FIXME
     type_ = get_type_hints(type(media))[attr]
     return replace(media, {attr: type_(value)})
@@ -252,7 +269,7 @@ def do_view(media: T):
 def _view_by_field(media: T):
     def _type_filter(type_: type) -> bool:
         return type_ in [bool, int, float, str, list, dict, tuple]
-
+    breakpoint()
     fs = [f for f in get_type_hints(type(media)).items() if _type_filter(f[1])]
 
     def _print_field(media: T, attr: tuple[str, type]):
@@ -264,12 +281,10 @@ def _view_by_field(media: T):
         elif is_assignable(type_, Iterable) and check_iterable_type(value, MediaEntity):
             _select([(m.title, do_view) for m in value], "Select Media")
         else:
-            print(f'{attr[0]}: {value}')
+            print(f"{attr[0]}: {value}")
             get_key()
 
-    _select(
-        media, [(f[0], partial(_print_field, attr=f)) for f in fs], "View by Field"
-    )
+    _select(media, [(f[0], partial(_print_field, attr=f)) for f in fs], "View by Field")
 
 
 def _select(media: T, ops: list[Op], label: str) -> T:
