@@ -1,7 +1,9 @@
+from mypy.stubtest import Signature
+import inspect
 import os
 from distutils import dir_util
 from pathlib import Path
-from typing import cast
+from typing import Callable, TypeVar, cast, get_type_hints
 
 from pytest import fixture
 
@@ -53,3 +55,35 @@ def data_path(tmp_path, request) -> Path:
         dir_util.copy_tree(test_dir, str(tmp_path))
 
     return tmp_path
+
+
+T = TypeVar("T")
+
+
+@fixture
+def dummy(fake) -> Callable[type[T], T]:
+    def valiable_func(obj, name) -> bool:
+       try:
+         func =  getattr(obj, name)
+         return s[0] != '_'  and callable(func)
+       except:
+         return False
+
+    fake_funcs = [for s in dir(fake) if valiable_func(fake, s)]
+
+    def _fake(name: str, type_: type[T]) -> T | None:
+        if(name in fake_funcs):
+            func = getattr(fake, name)
+            sig = inspect.signature(func)
+            if type_ == sig.return_annotation: #FIXME
+                return func()
+        name = f"py{type_}"
+        if(name in fake_funcs):
+            func = getattr(fake, name)
+            return func()
+        return None
+
+    def _create(type_: type[T]) -> T:
+        fs = get_type_hints(type_)
+        kwargs_ = {k, _fake(v)  for k, v in fs.items()}
+        return type_(**kwargs_)

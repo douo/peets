@@ -1,24 +1,57 @@
+'''
+通过定义一系列的 converter 称为 ConvertTable, 实现 addon:dict 到 target:dataclass 的转换/合并
+ConvertTable 实际的类型是 list[Converter]
+converter 的类型定义如下：
+converter:
+- dst: str 是 dataclass 的 field name
+- src: str 是 addon 的 key
+- convert: Callable[[Any,...], Any] ，将 addon[src] 传入，返回值赋予 dst
+- options: 用于配置 converter 的特殊行为
+
+定义方式 converter 的方式分为如下几种情况：
+1. dst(field name) 与 src(addon key) 相同：
+无须声明 converter，会自动找出与 key 相同名称的 field 进行默认逻辑赋值。
+2. dst 与 src 不同，但可以通过默认逻辑赋值
+type_1: tuple[str, str] = ("field", "key")
+3. src 需要通过 convert 才能赋值 dst
+type_2: tuple[str, Callable[[Any,...], Any]] = ("field", lambda key: None)
+注意 src 复用 lambda 表达式的参数名声明。所以就不需要重新声明 key。
+基于定义，这种方式是支持多个 keys 作为入参的
+type_2 是通用模式，其他声明方式都可以通过 type_2 实现
+4. 嵌套转换
+dst 的类型也是 dataclass/list[dataclass], src 对应的值也是 dict/list[dict]
+type_3: tuple[str, SubConvertTable] = ("field", ("key", [("sub_field", "sub_key")]))
+SubConvertTable 的实际类型是 tuple[str, ConvertTable]
+
+赋值逻辑：
+1. 简单类型：
+  a. 类型相同直接赋值
+  b. 尝试用 field type 的构造函数传入 addon[src]，失败将抛出异常
+2. 集合类型:
+  1. field type 为 list[T]，convert(addon[src]) 类型为 T，返回值将直接插入 dst
+  2. field type 为 dict[K,T], convert(addon[src]) 类型为 tuple[K, T] 返回值将直接更新到 dst
+3. 批量赋值
+可以同时为多个 dst 赋值，convert(addon[src]) 类型为 tuple[A,B,C,...] ，同时 dst 也是同样数量的 tuple[str,...]
+会按顺序将 A、B、C 按顺序应用默认逻辑赋值给对应的 dst
+
+
+'''
 from abc import ABCMeta, abstractmethod
 from dataclasses import replace as data_replace
 from itertools import chain
-from typing import (
-    Any,
-    Callable,
-    Protocol,
-    Tuple,
-    TypeAlias,
-    TypeGuard,
-    TypeVar,
-    Union,
-    cast,
-    get_type_hints,
-    runtime_checkable,
-)
+from typing import (Any, Callable, Protocol, Tuple, TypeAlias, TypeGuard,
+                    TypeVar, Union, cast, get_type_hints, runtime_checkable)
 
 from typing_inspect import get_args, get_origin, is_union_type
 
-from peets.util.type_utils import check_dict_type, check_iterable_type, is_assignable
+from peets.util.type_utils import (check_dict_type, check_iterable_type,
+                                   is_assignable)
 
+ConvertTable: TypeAlias = list["ConvertTable"]
+SubConvertTable: TypeAlias = tuple[str, ConvertTable]
+Dst: TypeAlias = str | tuple[str, ...]
+Src: TypeAlias = str | Callable | SubConvertTable
+Converter: TypeAlias = tuple[Dst, Src]
 
 class UnexceptType(Exception):
     pass

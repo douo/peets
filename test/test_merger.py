@@ -1,22 +1,16 @@
 from dataclasses import dataclass, field
 
-import pytest
-
-from peets.merger import (
-    FieldNotExistError,
-    MapTable,
-    UnexceptType,
-    create,
-    replace,
-    to_kwargs,
-)
+from pytest import raises, fixture
+from typing import get_type_hints
+from peets.merger import (FieldNotExistError, MapTable, UnexceptType, create,
+                          replace, to_kwargs)
 
 
 @dataclass(kw_only=True, frozen=True)
 class People:
     name: str = field(kw_only=False)
     title: str | None = None
-    level: int = 0
+    number: int = 0
     age: int | None = None
     # parent:tuple["People", "People"]
     pets: list[str] = field(default_factory=list)
@@ -32,10 +26,10 @@ class Department:
     position: dict[int, People] = field(default_factory=dict)
 
 
-def test_to_kwargs():
-    addon = {"name": "Demo", "year": 20, "demo": "something else"}
-
-    assert to_kwargs(People, addon) == {"name": "Demo"}
+def test_type_0():
+    assert to_kwargs(
+        People, {"name": "Demo", "year": 20, "demo": "something else"}
+    ) == {"name": "Demo"}
 
     addon = {
         "name": "Demo",
@@ -48,6 +42,8 @@ def test_to_kwargs():
 
     assert to_kwargs(People, addon) == addon
 
+
+def test_type_1():
     addon = {
         "account": "Demo",
         "age": "30",
@@ -57,6 +53,9 @@ def test_to_kwargs():
         "tools": {"pen": 1},
         "test": (1, "3"),
     }
+
+
+def test_to_kwargs():
 
     # table 的结构
     # addon key nanme, target field name, converter
@@ -127,7 +126,7 @@ def test_to_kwargs_empty_addon():
 def test_tokwargs_field_not_exist():
     addon = {"name": "Name", "pets": [1, 2]}
 
-    with pytest.raises(FieldNotExistError):
+    with raises(FieldNotExistError):
         to_kwargs(People, addon, [("pets", "not_exist")])
 
     # map_table 定义的 key 在 addon 不存在
@@ -144,40 +143,40 @@ def test_to_kwargs_type_not_match():
         "age": "abc",
     }
 
-    with pytest.raises(UnexceptType):
+    with raises(UnexceptType):
         to_kwargs(People, addon)
 
     addon = {"name": "Demo", "pets": 1}
 
-    with pytest.raises(UnexceptType):
+    with raises(UnexceptType):
         to_kwargs(People, addon)
 
     addon = {"name": "Demo", "tools": (1, 1)}
 
-    with pytest.raises(UnexceptType):
+    with raises(UnexceptType):
         to_kwargs(People, addon)
 
     # 对集合类也同样适用
     addon = {"name": "Demo", "pets": [1, 2, 3]}
 
-    with pytest.raises(UnexceptType):
+    with raises(UnexceptType):
         to_kwargs(People, addon)
 
     addon = {"name": "Demo", "tools": {1: 1}}
 
-    with pytest.raises(UnexceptType):
+    with raises(UnexceptType):
         to_kwargs(People, addon)
 
     # 混合类型的集合会检查所有项
 
     addon = {"name": "Demo", "pets": ["dog", 2, "cat"]}
 
-    with pytest.raises(UnexceptType):
+    with raises(UnexceptType):
         to_kwargs(People, addon)
 
     addon = {"name": "Demo", "tools": {"pen": 1, 3: "disc"}}
 
-    with pytest.raises(UnexceptType):
+    with raises(UnexceptType):
         to_kwargs(People, addon)
 
 

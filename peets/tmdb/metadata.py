@@ -255,7 +255,6 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
             language=self.language,
             append_to_response="credits, external_ids, content_ratings, keywords",
         )
-        print(tv_context)
         season_table: MapTable = [
             ("overview", "plot"),
             ("season_number", "season"),

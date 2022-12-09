@@ -14,14 +14,15 @@ dependencies = [
     "reflink == 0.2.1",
     "guessit",
     "teletype @ git+https://github.com/douo/teletype.git@master",
-    "readline"
+    "readline",
     "python-dateutil"
 ]
 
 [project.optional-dependencies]
 # pip install -e '.[tests]'
 tests = [
-  'pytest'
+  'pytest',
+  'faker'
 ]
 
 [tool.setuptools]
