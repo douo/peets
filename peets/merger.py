@@ -66,6 +66,7 @@ class Mergeable(Protocol, metaclass=ABCMeta):
     """
     用于元类检查，不是类型检查
     用于类型是否是 dataclass 注解的类
+    与 dataclasses.is_dataclass 作用相同
     """
 
     @staticmethod

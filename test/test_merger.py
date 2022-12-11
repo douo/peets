@@ -54,6 +54,15 @@ def test_type_1():
         "test": (1, "3"),
     }
 
+def test_dummy(dummy):
+    print(dummy)
+    p = dummy(People)
+    d = dummy(Department)
+    import pprint
+    pp = pprint.PrettyPrinter(indent=4).pprint
+    pp(p)
+    pp(d)
+
 
 def test_to_kwargs():
 
