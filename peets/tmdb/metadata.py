@@ -13,7 +13,7 @@ from peets.entities import (MediaAiredStatus, MediaArtwork, MediaCertification,
                             MediaFileType, MediaGenres, MediaRating, Movie,
                             MovieSet, Person, PersonType, TvShow)
 from peets.iso import Country, Language
-from peets.merger import MapTable, replace
+from peets.merger import ConvertTable, replace
 from peets.scraper import MetadataProvider, Provider, SearchResult
 
 from .config import _ARTWORK_BASE_URL, _PROFILE_BASE_URL, PROVIDER_ID
@@ -73,7 +73,7 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
             language=self.language, append_to_response="credits,keywords,release_dates"
         )
 
-        table: MapTable = [
+        table: ConvertTable = [
             (
                 "imdb_id",
                 "ids",
@@ -206,7 +206,7 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
     def _(self, tvshow: TvShow, **kwargs) -> TvShow:
         m_id = kwargs["id_"]
 
-        episode_table: MapTable = [
+        episode_table: ConvertTable = [
             # TODO external ids 需要调用 episode api
             ("id", "ids", lambda id_: (PROVIDER_ID, str(id_))),
             ("season_number", "season"),
@@ -255,7 +255,7 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
             language=self.language,
             append_to_response="credits, external_ids, content_ratings, keywords",
         )
-        season_table: MapTable = [
+        season_table: ConvertTable = [
             ("overview", "plot"),
             ("season_number", "season"),
             (
@@ -268,7 +268,7 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
             ),
         ]
         # lambda 表达式语法太繁琐
-        table: MapTable = [
+        table: ConvertTable = [
             ("id", "ids", lambda id_: (PROVIDER_ID, str(id_))),
             ("name", "title"),
             ("first_air_date", "first_aired"),

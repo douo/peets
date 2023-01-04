@@ -113,7 +113,7 @@ def dummy(faker) -> Callable[[type[T]], T]:
         if type_ == dict:
             if len(args_t) != 2:
                 raise TypeError("list should has 2 args type")
-            arg_t =args_t[1]
+            arg_t = args_t[1]
             if args_t[0] == str:
                 if is_union_type(arg_t):
                     return faker.pydict(value_types=get_args(arg_t))
@@ -130,7 +130,7 @@ def dummy(faker) -> Callable[[type[T]], T]:
                         v = _create_dataclass(args_t[1])
                     else:
                         v = _create_faker_type(args_t[1])
-                    items.append((k,v))
+                    items.append((k, v))
                 return dict(items)
 
             return func(value_types=args_t)
@@ -139,7 +139,11 @@ def dummy(faker) -> Callable[[type[T]], T]:
             if Ellipsis in args_t:  # tuple[str,...]
                 return faker.pytuple(value_types=args_t[0])
             else:
-                return faker.pytuple(nb_elements=len(args_t)+1, value_types=args_t)
+                return faker.pytuple(
+                    nb_elements=len(args_t),
+                    variable_nb_elements=False,
+                    value_types=args_t,
+                )
 
         raise TypeError(f"faker can't handle {type_}")
 
