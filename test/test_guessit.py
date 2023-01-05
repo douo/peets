@@ -176,3 +176,49 @@ def test_create_tvshow(create_file):
     assert set(mf_episode) == set(excepts)
 
     # interact(m, tmp_path, "simple")
+
+
+def test_create_multiple_episodes_tvshow(create_file):
+    f1 = create_file("Firefly - S01E01-02 - Serenity & The Train Job.mkv")
+    # media file
+    mf = [
+        f"{f1.stem}.nfo",
+        f"{f1.stem}-banner.jpg",
+        f"{f1.stem}-clearart.jpg",
+        f"{f1.stem}-clearlogo.jpg",
+        f"{f1.stem}-fanart.jpg",
+        f"{f1.stem}-logo.jpg",
+        f"{f1.stem}-poster.jpg",
+    ]
+
+    excepts = [
+        MediaFileType.NFO,
+        MediaFileType.BANNER,
+        MediaFileType.CLEARART,
+        MediaFileType.CLEARLOGO,
+        MediaFileType.FANART,
+        MediaFileType.LOGO,
+        MediaFileType.POSTER,
+    ]
+
+    mf = create_file(mf)
+
+    m = create_entity(f1)
+
+    assert len(m.episodes) == 2
+    e1_mf = [
+        mf[0]
+        for mf in m.retrieve_episode(1, 1).media_files
+        if mf[0] != MediaFileType.VIDEO
+    ]
+    e2_mf = [
+        mf[0]
+        for mf in m.retrieve_episode(1, 2).media_files
+        if mf[0] != MediaFileType.VIDEO
+    ]
+
+    assert set(e1_mf) == set(e2_mf) == set(excepts)
+    assert (
+        m.retrieve_episode(1, 1).multi_episode
+        and m.retrieve_episode(1, 2).multi_episode
+    )

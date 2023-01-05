@@ -1,7 +1,7 @@
 import os
 from collections.abc import Iterable
-from dataclasses import replace
 from enum import Enum
+from itertools import chain
 from pathlib import Path
 from pprint import pprint as pp
 from typing import Any, TypeVar
@@ -10,14 +10,7 @@ import regex
 from guessit.api import GuessItApi, guessit, merge_options
 from guessit.rules import rebulk_builder
 from guessit.rules.processors import Processors
-from guessit.rules.properties.audio_codec import audio_codec
-from guessit.rules.properties.crc import guess_idnumber
-from guessit.rules.properties.episode_title import (
-    POST_PROCESS,
-    episode_title,
-    title_seps,
-)
-from guessit.rules.properties.episodes import episodes
+from guessit.rules.properties.episode_title import POST_PROCESS
 from rebulk import CustomRule
 from rebulk.match import Match
 
@@ -164,6 +157,7 @@ def _create_tvshow(guess, path: Path, processed: set) -> TvShow:
     # 2. tvshow(season)/episode
     # 3. .../episode
     # TODO 相同剧集位于不同目录的情况 a/tvshow b/tvshow
+    # TODO 同一个文件包含多个 episode
 
     season_maybe = path.parent
     tvshow_maybe = path.parent.parent
@@ -173,7 +167,6 @@ def _create_tvshow(guess, path: Path, processed: set) -> TvShow:
 
     tvshow_path = None
     # FIXME 不可靠
-    # breakpoint()
     def _is_tvshow_of(episode, maybe) -> dict | None:
         tvshow_guess = guessit(maybe)
         # episode 可能有两个标题第一个是 tvshow 第二个是 episode
@@ -199,12 +192,8 @@ def _create_tvshow(guess, path: Path, processed: set) -> TvShow:
     else:
         # 情况3
         tvshow_guess["episodes"] = [
-            _do_create(
-                processed,
-                path,
-                TvShowEpisode,
-                _do_guess_episode(path, episode_guess)[1],
-            )
+            _do_create(processed, path, TvShowEpisode, e_addon)
+            for _, e_addon in _do_guess_episode(path, episode_guess)
         ]
         tvshow = _do_create(processed, path, TvShow, tvshow_guess)
         return tvshow
@@ -213,7 +202,7 @@ def _create_tvshow(guess, path: Path, processed: set) -> TvShow:
 def _create_tvshow_batch(tvshow_guess, path: Path, processed: set) -> TvShow:
     episodes: list[TvShowEpisode] = [
         _do_create(processed, p, TvShowEpisode, guess)
-        for p, guess in (_do_guess_episode(media) for media in traverse(path))
+        for p, guess in chain(*(_do_guess_episode(media) for media in traverse(path)))
         if guess["type"] == "episode"
         and (
             "other" not in guess
@@ -226,7 +215,7 @@ def _create_tvshow_batch(tvshow_guess, path: Path, processed: set) -> TvShow:
     return tvshow
 
 
-def _do_guess_episode(path: Path, addon: dict | None = None) -> tuple[Path, dict]:
+def _do_guess_episode(path: Path, addon: dict | None = None) -> list[tuple[Path, dict]]:
     mfs = [
         (parse_mediafile_type(child), child)
         for child in path.parent.iterdir()
@@ -238,14 +227,28 @@ def _do_guess_episode(path: Path, addon: dict | None = None) -> tuple[Path, dict
         addon = guessit(path)
     addon["media_files"] = mfs
     addon["original_filename"] = path.name
-    return (path, addon)
+    if isinstance(addon["episode"], list):
+        # multiple episode in single file
+        def split_episodes(e) -> dict:
+            new_addon = addon.copy()
+            new_addon["episode"] = e
+            new_addon["multi_episode"] = True
+            return new_addon
+
+        return [(path, split_episodes(e)) for e in addon["episode"]]
+    else:
+        return [(path, addon)]
 
 
 # TODO guessit 属性可能是值或者列表，处理起来很不方便
 _map_table: ConvertTable = [
     (
         "audio_codec",
-        lambda audio_codec: "&".join(audio_codec) if isinstance(audio_codec, Iterable) else audio_codec, Option.KEY_NOT_EXIST_IGNORE_ANY),
+        lambda audio_codec: "&".join(audio_codec)
+        if isinstance(audio_codec, Iterable)
+        else audio_codec,
+        Option.KEY_NOT_EXIST_IGNORE_ANY,
+    ),
     ("title", lambda title: title[0] if isinstance(title, list) else title),
 ]
 
