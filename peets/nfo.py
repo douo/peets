@@ -9,7 +9,6 @@ from peets.entities import (
     Movie,
 )
 
-
 def _uniqueid(root: ET.Element, movie: Movie):
     for k, v in movie.ids.items():
         child = ET.Element(
