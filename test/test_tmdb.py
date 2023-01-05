@@ -1,8 +1,3 @@
-import json
-import sys
-
-from pytest import fixture
-
 from peets.entities import (
     MediaAiredStatus,
     MediaCertification,
@@ -98,50 +93,3 @@ def test_tvshow(hijack):
     assert e.season == 1
     assert e.episode == 1
     assert len(e.actors) == 9
-
-
-@fixture
-def hijack(data_path, monkeypatch, request):
-    """
-    包装了 monkeypatch fixture，方便用文件内容替换掉函数返回
-    """
-
-    def parse(path):
-        """
-        将 tmdbsimple.base.TMDB._GET 转换为 (tmdbsimple.base.TMDB, '_GET')（类引用，'方法名'）
-        """
-        end = len(path)
-        while True:
-            try:
-                ridx = path.rindex(".", 0, end)
-            except ValueError as exp:
-                raise ModuleNotFoundError() from exp
-            if ridx != -1 and path[:ridx] in sys.modules:
-                mod = sys.modules[path[:ridx]]
-                break
-            end = ridx
-
-        if mod:
-            sub = path[ridx + 1 :]
-            refs = sub.split(".")
-            pre = mod
-            for r in refs[:-1]:
-                pre = getattr(pre, r)
-            return (pre, refs[-1])
-
-    with monkeypatch.context() as m:
-
-        def mock(name: str, path="tmdbsimple.base.TMDB._GET"):
-            """
-            将文件内容作为函数的返回
-
-            @name str: 文件名
-            @path str: 函数路径
-            """
-            with open(f"{data_path}/{name}") as f:
-                data = json.load(f)
-            clazz, func = parse(path)
-            m.setattr(clazz, func, lambda *x: data)
-            return data
-
-        yield mock
