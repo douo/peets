@@ -9,11 +9,21 @@ from typing import TypeVar
 import tmdbsimple as tmdb
 from dateutil.parser import isoparse
 
-from peets.entities import (MediaAiredStatus, MediaArtwork, MediaCertification,
-                            MediaFileType, MediaGenres, MediaRating, Movie,
-                            MovieSet, Person, PersonType, TvShow)
+from peets.entities import (
+    MediaAiredStatus,
+    MediaArtwork,
+    MediaCertification,
+    MediaFileType,
+    MediaGenres,
+    MediaRating,
+    Movie,
+    MovieSet,
+    Person,
+    PersonType,
+    TvShow,
+)
 from peets.iso import Country, Language
-from peets.merger import ConvertTable, replace
+from peets.merger import ConvertTable, Option, replace
 from peets.scraper import MetadataProvider, Provider, SearchResult
 
 from .config import _ARTWORK_BASE_URL, _PROFILE_BASE_URL, PROVIDER_ID
@@ -75,26 +85,25 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
 
         table: ConvertTable = [
             (
-                "imdb_id",
                 "ids",
-                lambda id_: ("imdb", str(id_)),
+                lambda imdb_id: ("imdb", str(imdb_id)),
             ),  # dict 类型的返回 (key value)
-            ("id", "ids", lambda id_: (PROVIDER_ID, str(id_))),
-            ("overview", "plot"),
+            ("ids", lambda id: (PROVIDER_ID, str(id))),
+            ("plot", "overview"),
             (
-                ("vote_average", "vote_count"),
                 "ratings",
-                lambda va, vc: (
+                lambda vote_average, vote_count: (
                     PROVIDER_ID,
-                    MediaRating(rating_id="tmdb", rating=va, votes=vc),
+                    MediaRating(
+                        rating_id="tmdb", rating=vote_average, votes=vote_count
+                    ),
                 ),
             ),
             (
-                ("poster_path", "id"),
                 "artwork_url_map",  # TODO artwork 应该另外处理？
-                lambda path, id_: (
+                lambda poster_path, id: (
                     MediaFileType.POSTER,
-                    f"{_ARTWORK_BASE_URL}original{path}",
+                    f"{_ARTWORK_BASE_URL}original{poster_path}",
                 )
                 # MediaArtwork(
                 #     provider_id=PROVIDER_ID,
@@ -107,20 +116,17 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
             ),  # 列表类型，返回单项表示插入？？
             (
                 "spoken_languages",
-                "spoken_languages",
                 lambda spoken_languages: ", ".join(
                     [lang["iso_639_1"] for lang in spoken_languages]
                 ),
             ),
             (
-                "production_countries",
                 "country",
                 lambda production_countries: ", ".join(
                     [country["iso_3166_1"] for country in production_countries]
                 ),
             ),
             (
-                "production_companies",
                 "production_company",
                 lambda production_companies: ", ".join(
                     [company["name"] for company in production_companies]
@@ -129,27 +135,23 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
             # 一对多的情况下，支持通过 tuple 指定
             # 转换函数表示默认赋值
             (
-                "release_date",
                 "year",
                 lambda release_date: datetime.strptime(release_date, "%Y-%m-%d").year,
             ),
             (
-                ("release_dates", "production_countries"),
                 "release_date",
                 lambda release_dates, production_countries: self._parse_release_date(
                     release_dates, production_countries
                 ),
             ),
             (
-                ("release_dates", "production_countries"),
                 "certification",
                 lambda release_dates, production_countries: self._parse_certification(
                     release_dates, production_countries
                 ),
             ),
             # credits TODO partition
-            (
-                "credits",
+            *zip(
                 ("actors", "producers", "directors", "writers"),
                 (
                     _credits_filter(PersonType.ACTOR),
@@ -159,25 +161,17 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
                 ),
             ),
             # genres
-            ("genres", "genres", lambda genres: [_to_genre(g) for g in genres]),
-            ("adult", "genres", lambda adult: MediaGenres.EROTIC if adult else []),
+            ("genres", lambda genres: [_to_genre(g) for g in genres]),
+            ("genres", lambda adult: MediaGenres.EROTIC if adult else []),
             (
-                "belongs_to_collection",
                 ("movie_set", "ids"),
-                (
-                    (
-                        lambda data: MovieSet(name=data["name"], tmdb_id=data["id"])
-                        if data
-                        else None
-                    ),
-                    (lambda data: ("tmdbSet", str(data["id"])) if data else {}),
+                lambda belongs_to_collection: (
+                    MovieSet(name=belongs_to_collection["name"], tmdb_id=belongs_to_collection["id"]),
+                    ("tmdbSet", str(belongs_to_collection["id"])),
                 ),
+                Option.KEY_NOT_EXIST_IGNORE_ANY,
             ),
-            (
-                "keywords",
-                "tags",
-                lambda keywords: [k["name"] for k in keywords["keywords"]],
-            ),
+            ("tags", lambda keywords: [k["name"] for k in keywords["keywords"]]),
         ]
 
         return replace(movie, context, table)
@@ -208,38 +202,36 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
 
         episode_table: ConvertTable = [
             # TODO external ids 需要调用 episode api
-            ("id", "ids", lambda id_: (PROVIDER_ID, str(id_))),
-            ("season_number", "season"),
-            ("episode_number", "episode"),
-            ("name", "title"),
-            ("overview", "plot"),
+            ("ids", lambda id: (PROVIDER_ID, str(id))),
+            ("season", "season_number"),
+            ("episode", "episode_number"),
+            ("title", "name"),
+            ("plot", "overview"),
             (
-                ("vote_average", "vote_count"),
                 "ratings",
-                lambda va, vc: (
+                lambda vote_average, vote_count: (
                     PROVIDER_ID,
-                    MediaRating(rating_id="tmdb", rating=va, votes=vc),
+                    MediaRating(
+                        rating_id="tmdb", rating=vote_average, votes=vote_count
+                    ),
                 ),
             ),
-            ("air_date", "first_aired"),
-            (
-                "crew",
+            ("first_aired", "air_date"),
+            *zip(
                 ("directors", "writers"),
                 (_crew_filter(PersonType.DIRECTOR), _crew_filter(PersonType.WRITER)),
             ),
             (
-                "guest_stars",
                 "actors",
-                lambda guest_starts: [
-                    _conv_people(c, PersonType.ACTOR) for c in guest_starts
+                lambda guest_stars: [
+                    _conv_people(c, PersonType.ACTOR) for c in guest_stars
                 ],
             ),
             (
-                ("still_path", "id"),
                 "artwork_url_map",  # TODO artwork 应该另外处理？
-                lambda path, id_: (
+                lambda still_path, id: (
                     MediaFileType.THUMB,
-                    f"{_ARTWORK_BASE_URL}original{path}",
+                    f"{_ARTWORK_BASE_URL}original{still_path}",
                 ),
             ),
         ]
@@ -256,51 +248,47 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
             append_to_response="credits, external_ids, content_ratings, keywords",
         )
         season_table: ConvertTable = [
-            ("overview", "plot"),
-            ("season_number", "season"),
+            ("plot", "overview"),
+            ("season", "season_number"),
             (
-                "poster_path",
                 "artwork_url_map",  # TODO artwork 应该另外处理？
-                lambda path: (
+                lambda poster_path: (
                     MediaFileType.POSTER,
-                    f"{_ARTWORK_BASE_URL}original{path}",
+                    f"{_ARTWORK_BASE_URL}original{poster_path}",
                 ),
             ),
         ]
         # lambda 表达式语法太繁琐
         table: ConvertTable = [
-            ("id", "ids", lambda id_: (PROVIDER_ID, str(id_))),
-            ("name", "title"),
-            ("first_air_date", "first_aired"),
-            ("overview", "plot"),
+            ("ids", lambda id: (PROVIDER_ID, str(id))),
+            ("title", "name"),
+            ("first_aired", "first_air_date"),
+            ("plot", "overview"),
             (
-                ("vote_average", "vote_count"),
                 "ratings",
-                lambda va, vc: (
+                lambda vote_average, vote_count: (
                     PROVIDER_ID,
-                    MediaRating(rating_id="tmdb", rating=va, votes=vc),
+                    MediaRating(
+                        rating_id="tmdb", rating=vote_average, votes=vote_count
+                    ),
                 ),
             ),
             (
-                "origin_country",
                 "country",
                 lambda origin_country: ", ".join(origin_country),
             ),
             (
-                "episode_run_time",
                 "runtime",
                 lambda episode_run_time: episode_run_time[0] if episode_run_time else 0,
             ),
             (
-                ("poster_path", "id"),
                 "artwork_url_map",  # TODO artwork 应该另外处理？
-                lambda path, id_: (
+                lambda poster_path, id: (
                     MediaFileType.POSTER,
-                    f"{_ARTWORK_BASE_URL}original{path}",
+                    f"{_ARTWORK_BASE_URL}original{poster_path}",
                 ),
             ),
             (
-                ("networks", "production_companies"),
                 "production_company",
                 lambda networks, production_companies: ", ".join(
                     [n["name"] for n in networks]
@@ -309,40 +297,42 @@ class TmdbMovieMetadata(MetadataProvider[Movie]):
             ),
             (
                 "status",
-                "status",
                 lambda status: MediaAiredStatus.retrieve_status(status),
             ),
             (
-                "first_air_date",
                 "year",
-                lambda release_date: datetime.strptime(release_date, "%Y-%m-%d").year,
+                lambda first_air_date: datetime.strptime(
+                    first_air_date, "%Y-%m-%d"
+                ).year,
             ),
-            ("credits", "actors", _credits_filter(PersonType.ACTOR)),
+            ("actors", _credits_filter(PersonType.ACTOR)),
             (
-                "external_ids",
                 "ids",
-                lambda id_: ("imdb", id_["imdb_id"] if id_ else '')
+                lambda external_ids: ("imdb", external_ids["imdb_id"]),
+                Option.KEY_NOT_EXIST_IGNORE_ANY,
             ),
             (
-                "external_ids",
                 "ids",
-                lambda id_: ("tvdb", str(id_["tvdb_id"]) if id_ else '')
+                lambda external_ids: ("tvdb", str(external_ids["tvdb_id"])),
+                Option.KEY_NOT_EXIST_IGNORE_ANY,
             ),
             (
-                ("content_ratings", "production_countries"),
                 "certification",
                 lambda content_ratings, production_countries: self._parse_content_rating(
                     content_ratings, production_countries
                 ),
             ),
-            ("genres", "genres", lambda genres: [_to_genre(g) for g in genres]),
-            ("adult", "genres", lambda adult: MediaGenres.EROTIC if adult else []),
+            ("genres", lambda genres: [_to_genre(g) for g in genres]),
             (
-                "keywords",
+                "genres",
+                lambda adult: MediaGenres.EROTIC if adult else [],
+                Option.KEY_NOT_EXIST_IGNORE_ANY,
+            ),
+            (
                 "tags",
                 lambda keywords: [k["name"] for k in keywords["results"]],
             ),
-            ("seasons", "seasons", season_table),
+            ("seasons", ("seasons", season_table)),
         ]
 
         tvshow = replace(tvshow, tv_context, table)
