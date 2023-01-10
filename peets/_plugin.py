@@ -4,11 +4,10 @@ from typing import Any, Callable, TypeVar, cast
 
 from pluggy import HookimplMarker, HookspecMarker, PluginManager
 
-
-from peets.config import Config, NAME
+from peets.config import NAME, Config
 from peets.nfo import Connector
 from peets.nfo.kodi import MovieKodiConnector
-from peets.scraper import Provider, MetadataProvider
+from peets.scraper import Feature, MetadataProvider, Provider
 from peets.tmdb import TmdbArtworkProvider, TmdbMetadataProvider
 
 # 保留函数的 type annotations
@@ -78,15 +77,14 @@ class Plugin:
 
     @cache
     def get_providers(self) -> list[Provider]:
-        return _flat(self.manager.hook.get_providers(config = self.config))
+        return _flat(self.manager.hook.get_providers(config=self.config))
 
     @cache
     def get_connectors(self) -> list[Connector]:
-        return _flat(self.manager.hook.get_connectors(config = self.config))
+        return _flat(self.manager.hook.get_connectors(config=self.config))
 
     def connectors(self, media: T) -> list[Connector[T]]:
         return [c for c in self.get_connectors() if c.is_available(media)]
-
 
     def metadata(self, media: T) -> list[MetadataProvider[T]]:
         return [
@@ -94,7 +92,6 @@ class Plugin:
             for p in self.get_providers()
             if p.is_available(media) and isinstance(p, MetadataProvider)
         ]
-
 
     def artwork(self, media: T) -> list[Provider[T]]:
         return [

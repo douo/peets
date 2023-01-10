@@ -347,7 +347,7 @@ def _preprocess_converter(converter: Converter, addon: dict):
             keys = _make_sure_tuple(key)
             values = (addon.get(key),)
         case _:
-            raise TypeError(f"{type(src)=} is not a type of {Src=} .")
+            raise TypeError(f"{type(converter[1])=} is not a type of {Src=} .")
 
     opt = opt[0] if opt else None
     return (dst, keys, values, table, opt)

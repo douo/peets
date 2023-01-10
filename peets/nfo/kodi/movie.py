@@ -111,7 +111,7 @@ class MovieKodiConnector(Connector[Movie]):
             ("sorttitle", "sort_title"),
             ("year", lambda year: year if year != 0 else ""),
             (
-                "rating",
+                "rating",  # TODO copy from tvshow
                 lambda ratings: "{:.1f}".format(
                     ratings["tmdb"].rating * 10 / ratings["tmdb"].max_value
                 ),
@@ -124,7 +124,7 @@ class MovieKodiConnector(Connector[Movie]):
             "tagline",
             "runtime",
             (
-                "thumb",
+                "thumb",  # TODO copy from tvshow
                 lambda artwork_url_map: artwork_url_map.get(MediaFileType.POSTER),
             ),
             (
