@@ -1,4 +1,4 @@
-from peets.nfo import connector
+from pylsp import hookspecs
 
 from peets.entities import (
     MediaAiredStatus,
@@ -10,13 +10,14 @@ from peets.entities import (
     TvShowEpisode,
 )
 from peets.iso import Country, Language
-from peets.tmdb import TmdbMovieMetadata
+from peets import manager
+from peets.tmdb import TmdbMetadataProvider
 
 
 def test_detail(hijack, dummy):
     # m = dummy(Movie)  # FIXME buggy
     data = hijack("movie.json")
-    tmdb = TmdbMovieMetadata(language=Language.ZH, country=Country.CN)
+    tmdb = TmdbMetadataProvider(language=Language.ZH, country=Country.CN)
     m = tmdb.apply(Movie(), id_=0)
-    c = connector(m)[0]
+    c = manager.connectors(m)[0]
     print(c.generate(m))

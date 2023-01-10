@@ -7,6 +7,7 @@ from typing import Any, Generic, TypeVar
 
 from peets.entities import MediaEntity
 
+
 T = TypeVar("T", bound=MediaEntity)
 
 
@@ -53,30 +54,3 @@ class MetadataProvider(Provider[T], Generic[T]):
     @property
     def features(self) -> list[Feature]:
         return [Feature.Metadata]
-
-
-global providers
-providers: list[Provider] = []
-
-
-def register(*p: Provider):
-    global providers
-    providers += p
-
-
-def metadata(media: T) -> list[MetadataProvider[T]]:
-    global providers
-    return [
-        p
-        for p in providers
-        if p.is_available(media) and isinstance(p, MetadataProvider)
-    ]
-
-
-def artwork(media: T) -> list[Provider[T]]:
-    global providers
-    return [
-        p
-        for p in providers
-        if p.is_available(media) and Feature.Artwork in p.features
-    ]

@@ -93,8 +93,8 @@ def _showlinks(showlinks) -> list[ET._Element]:
 
 
 class MovieKodiConnector(Connector[Movie]):
-    def __init__(self, name: str) -> None:
-        super().__init__(name)
+    def __init__(self) -> None:
+        super().__init__("kodi")
 
     @property
     def available_type(self) -> list[str]:

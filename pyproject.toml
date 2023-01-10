@@ -7,6 +7,7 @@ name = "peets"
 version = "0.0.1"
 dependencies = [
     "typing_inspect",  # 运行时泛型内省（introspection）
+    "pluggy",
     "requests",
     "lxml",
     "regex",

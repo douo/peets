@@ -1,6 +1,5 @@
 import inspect
 from abc import ABC, abstractmethod
-
 from types import FunctionType
 from typing import Callable, Generic, TypeAlias, TypeVar, get_type_hints
 
@@ -11,11 +10,9 @@ from peets.util.type_utils import check_iterable_type
 
 T = TypeVar("T", bound=MediaEntity)
 
+
 class Connector(ABC, Generic[T]):
-    def __init__(
-        self,
-        name: str
-    ) -> None:
+    def __init__(self, name: str) -> None:
         self.name = name
 
     @abstractmethod
@@ -28,26 +25,7 @@ class Connector(ABC, Generic[T]):
         pass
 
     def is_available(self, media: T) -> bool:
-        return type(media).__name__.lower() in [
-            t.lower() for t in self.available_type
-        ]
-
-global connectors
-connectors: list[Connector] = []
-
-
-def register(*p: Connector):
-    global connectors
-    connectors += p
-
-def connector(media: T) -> list[Connector[T]]:
-    global connectors
-    return [
-        c
-        for c in connectors
-        if c.is_available(media)
-    ]
-
+        return type(media).__name__.lower() in [t.lower() for t in self.available_type]
 
 
 # TODO 追加一个 trigger ，只有 trigger 返回 True, 该 Item 才会生效
@@ -122,6 +100,7 @@ def _process_callable(conv: FunctionType, root: ET._Element, entity: MediaEntity
     type_hints = get_type_hints(type(entity))
     entity_type = type(entity).__name__.lower()
     print(f"{entity_type=}")
+
     def _to_param(arg: str, annt: type | None):
         if arg == "root" and annt is ET._Element:
             return root

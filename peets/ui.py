@@ -16,10 +16,10 @@ from teletype.components import ChoiceHelper, SelectOne
 from teletype.io import get_key, style_input
 
 import peets.naming as naming
+from peets import manager
 from peets.entities import MediaEntity, MediaFileType, Movie, TvShow, TvShowEpisode
 from peets.merger import replace
-from peets.nfo import generate_nfo
-from peets.scraper import MetadataProvider, Provider, artwork, metadata
+from peets.scraper import MetadataProvider, Provider
 from peets.util.type_utils import check_iterable_type, is_assignable
 
 pp = pprint.PrettyPrinter(indent=2)
@@ -310,7 +310,7 @@ def _brief(media: MediaEntity):
 
 
 def _pick_metadata_scraper(media: T) -> MetadataProvider[T]:
-    scrapers = metadata(media)
+    scrapers = manager.metadata(media)
     if len(scrapers) > 1:
         choices = [ChoiceHelper(s, label=f"{type(s)}", style="bold") for s in scrapers]
         return SelectOne(choices).prompt()
@@ -319,7 +319,7 @@ def _pick_metadata_scraper(media: T) -> MetadataProvider[T]:
 
 
 def _pick_artwork_scraper(media: T) -> Provider[T]:
-    scrapers = artwork(media)
+    scrapers = manager.artwork(media)
     if len(scrapers) > 1:
         choices = [ChoiceHelper(s, label=f"{type(s)}", style="bold") for s in scrapers]
         return SelectOne(choices).prompt()
@@ -364,7 +364,7 @@ def do_process(media: MediaEntity, lib_path: Path, naming_style: str):
 
     if not media.has_media_file(MediaFileType.NFO):
         with tempfile.NamedTemporaryFile(suffix=".nfo", delete=False) as f:
-            nfo = generate_nfo(media)
+            nfo = manager.connectors(media)[0]  # FIXME
             f.write(nfo)
             print(f"parsing nfo to {f.name}")
 

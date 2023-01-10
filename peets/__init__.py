@@ -1,13 +1,12 @@
-from peets.scraper import register
-from peets.nfo import register as nfo_register
-from peets.nfo.kodi.movie import MovieKodiConnector
-from peets.tmdb import TmdbArtworkProvider, TmdbMovieMetadata
-from peets.iso import Language, Country
+from peets._plugin import Plugin
+from peets.config import Config
 
-lang = Language.ZH
-country = Country.CN
+_config = Config()
+manager = Plugin(_config)
 
-register(TmdbArtworkProvider(lang, country),
-         TmdbMovieMetadata(lang, country))
 
-nfo_register(MovieKodiConnector("kodi"))
+def get_config() -> Config:
+    return _config
+
+
+__all__ = ("get_config", "manager")

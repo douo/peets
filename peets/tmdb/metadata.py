@@ -29,7 +29,7 @@ from peets.scraper import MetadataProvider, Provider, SearchResult
 from .config import _ARTWORK_BASE_URL, _PROFILE_BASE_URL, PROVIDER_ID
 
 
-class TmdbMovieMetadata(MetadataProvider[Movie]):
+class TmdbMetadataProvider(MetadataProvider[Movie]):
     T = TypeVar("T", Movie, TvShow)
 
     def __init__(
