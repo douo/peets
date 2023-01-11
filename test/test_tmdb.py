@@ -9,11 +9,11 @@ from peets.entities import (
 )
 from peets.iso import Country, Language
 from peets.tmdb import TmdbArtworkProvider, TmdbMetadataProvider
-
+from peets import get_config
 
 def test_detail(hijack):
     data = hijack("movie.json")
-    tmdb = TmdbMetadataProvider(language=Language.ZH, country=Country.CN)
+    tmdb = TmdbMetadataProvider(get_config())
     m = tmdb.apply(Movie(), id_=0)
 
     assert m.ids["imdb"] == data["imdb_id"]
@@ -28,7 +28,7 @@ def test_detail(hijack):
 def test_artwork(hijack):
     hijack("movie_images.json")
 
-    tmdb = TmdbArtworkProvider(language=Language.ZH, country=Country.CN)
+    tmdb = TmdbArtworkProvider(get_config())
 
     m = tmdb.apply(Movie(ids={"tmdb": 0}))
 
@@ -41,7 +41,7 @@ def test_artwork(hijack):
 def test_metadata_original_release_date_only(hijack):
     hijack("movie_original_release_date_only.json")
 
-    tmdb = TmdbMetadataProvider(language=Language.ZH, country=Country.CN)
+    tmdb = TmdbMetadataProvider(get_config())
     m = tmdb.apply(Movie(), id_=0)
 
     assert m.release_date == "2022-07-08"
@@ -49,7 +49,7 @@ def test_metadata_original_release_date_only(hijack):
 
 def test_metadata_certification(hijack):
     hijack("movie_certification.json")
-    tmdb = TmdbMetadataProvider(language=Language.ZH, country=Country.CN)
+    tmdb = TmdbMetadataProvider(get_config())
     m = tmdb.apply(Movie(), id_=0)
 
     assert m.certification == MediaCertification.US_PG13
@@ -58,7 +58,7 @@ def test_metadata_certification(hijack):
 def test_tvshow(hijack):
     hijack("tvshow.json", "tmdbsimple.TV._GET")
     hijack("season.json", "tmdbsimple.TV_Seasons._GET")
-    tmdb = TmdbMetadataProvider(language=Language.ZH, country=Country.CN)
+    tmdb = TmdbMetadataProvider(get_config())
     episodes = [TvShowEpisode(season=1, episode=1)]
     m = tmdb.apply(TvShow(episodes=episodes), id_=0)
 

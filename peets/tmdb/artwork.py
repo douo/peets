@@ -1,21 +1,22 @@
 from peets.entities import MediaEntity, MediaFileType
 from peets.scraper import Feature, Provider
-from peets.iso import Language, Country
+from peets.iso import Country
 from peets.merger import replace
+from peets.config import Config
 import tmdbsimple as tmdb
-from .config import PROVIDER_ID, _ARTWORK_BASE_URL
+from .const import PROVIDER_ID, _ARTWORK_BASE_URL
+
 
 class TmdbArtworkProvider(Provider[MediaEntity]):
-    def __init__(self,
-                 language: Language,
-                 country: Country,
-                 include_adult: bool = True,
-                 ) -> None:
+    def __init__(self, config: Config) -> None:
         super().__init__()
-
-        self.language = language.name.lower()
+        self.language = f"{config.language.name}-{config.country.name}".lower()
+        self.country = config.country.name
+        self.include_adult = config.include_adult
+        self.fallback_country = Country.US.name
         self.fallback_lan = "en"
 
+        tmdb.API_KEY = config.tmdb_key  # side effect
 
     def apply(self, media: MediaEntity, **kwargs) -> MediaEntity:
         m_id = media.ids[PROVIDER_ID]

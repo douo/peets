@@ -1,4 +1,4 @@
-from .movie import MovieKodiConnector
+from .common import CommonKodiConnector
 
 
-__all__ = ('MovieKodiConnector', )
+__all__ = ('CommonKodiConnector', )

@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import inspect
 from abc import ABC, abstractmethod
+from datetime import datetime
 from types import FunctionType
 from typing import Callable, Generic, TypeAlias, TypeVar, get_type_hints
 
@@ -15,8 +18,26 @@ class Connector(ABC, Generic[T]):
     def __init__(self, name: str) -> None:
         self.name = name
 
-    @abstractmethod
     def generate(self, media: T) -> str:
+        root = ET.Element(self.get_root_name(media))
+        root.addprevious(ET.Comment(f"created on {datetime.now().isoformat()}"))
+        doc = ET.ElementTree(root)
+
+        inflate(root, media, self.nfo_table(media))
+
+        return ET.tostring(
+            doc,
+            pretty_print=True,
+            xml_declaration=True,
+            encoding="UTF-8",
+            standalone=True,
+        )
+
+    def get_root_name(self, media: T) -> str:
+        return type(media).__name__.lower()
+
+    @abstractmethod
+    def nfo_table(self, media: T) -> NfoTable:
         pass
 
     @property
@@ -43,7 +64,9 @@ NfoItem: TypeAlias = (
 NfoTable: TypeAlias = list[NfoItem]
 
 
-def create_element(tag: str, text: str | None, **extra) -> ET._Element:
+
+
+def create_element(tag: str, text: str | None = None, **extra) -> ET._Element:
     ele = ET.Element(tag, **extra)
     if text:
         ele.text = text

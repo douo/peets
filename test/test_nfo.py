@@ -10,14 +10,25 @@ from peets.entities import (
     TvShowEpisode,
 )
 from peets.iso import Country, Language
-from peets import manager
+from peets import manager, get_config
 from peets.tmdb import TmdbMetadataProvider
 
 
 def test_detail(hijack, dummy):
     # m = dummy(Movie)  # FIXME buggy
+    import pprint
+    print = pprint.PrettyPrinter(indent=4).pprint
     data = hijack("movie.json")
-    tmdb = TmdbMetadataProvider(language=Language.ZH, country=Country.CN)
+    tmdb = TmdbMetadataProvider(get_config())
     m = tmdb.apply(Movie(), id_=0)
+    c = manager.connectors(m)[0]
+    print(c.generate(m))
+
+
+    hijack("tvshow.json", "tmdbsimple.TV._GET")
+    hijack("season.json", "tmdbsimple.TV_Seasons._GET")
+    episodes = [TvShowEpisode(season=1, episode=1)]
+    m = tmdb.apply(TvShow(episodes=episodes), id_=0)
+
     c = manager.connectors(m)[0]
     print(c.generate(m))

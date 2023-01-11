@@ -9,9 +9,9 @@ from typing import TypeVar
 import tmdbsimple as tmdb
 from dateutil.parser import isoparse
 
+from peets.config import Config
 from peets.entities import (
     MediaAiredStatus,
-    MediaArtwork,
     MediaCertification,
     MediaFileType,
     MediaGenres,
@@ -22,41 +22,36 @@ from peets.entities import (
     PersonType,
     TvShow,
 )
-from peets.iso import Country, Language
+from peets.iso import Country
 from peets.merger import ConvertTable, Option, replace
-from peets.scraper import MetadataProvider, Provider, SearchResult
+from peets.scraper import MetadataProvider, SearchResult
 
-from .config import _ARTWORK_BASE_URL, _PROFILE_BASE_URL, PROVIDER_ID
+from .const import _ARTWORK_BASE_URL, _PROFILE_BASE_URL, PROVIDER_ID
 
 
 class TmdbMetadataProvider(MetadataProvider[Movie]):
     T = TypeVar("T", Movie, TvShow)
 
-    def __init__(
-        self,
-        language: Language,
-        country: Country,
-        include_adult: bool = True,
-    ) -> None:
+    def __init__(self, config: Config) -> None:
         super().__init__()
-
-        self.language = f"{language.name}-{country.name}".lower()
-        self.country = country.name
-        self.include_adult = include_adult
-
+        self.language = f"{config.language.name}-{config.country.name}".lower()
+        self.country = config.country.name
+        self.include_adult = config.include_adult
         self.fallback_country = Country.US.name
         self.fallback_lan = "en-us"
+
+        tmdb.API_KEY = config.tmdb_key  # side effect
 
     @property
     def available_type(self) -> list[str]:
         return ["movie", "tvshow"]
 
     @singledispatchmethod
-    def search(self, media: T) -> list[SearchResult]:
+    def search(self, media: T) -> list[SearchResult]:  # type: ignore[override]
         raise NotImplementedError()
 
     @singledispatchmethod
-    def apply(self, media: T, **kwargs) -> T:
+    def apply(self, media: T, **kwargs) -> T:  # type: ignore[override]
         raise NotImplementedError()
 
     @search.register
@@ -75,7 +70,7 @@ class TmdbMetadataProvider(MetadataProvider[Movie]):
             for d in api.results
         ]
 
-    @apply.register
+    @apply.register(Movie)
     def _(self, movie: Movie, **kwargs) -> Movie:
         m_id = kwargs["id_"]
         api = tmdb.Movies(m_id)
@@ -166,7 +161,10 @@ class TmdbMetadataProvider(MetadataProvider[Movie]):
             (
                 ("movie_set", "ids"),
                 lambda belongs_to_collection: (
-                    MovieSet(name=belongs_to_collection["name"], tmdb_id=belongs_to_collection["id"]),
+                    MovieSet(
+                        name=belongs_to_collection["name"],
+                        tmdb_id=belongs_to_collection["id"],
+                    ),
                     ("tmdbSet", str(belongs_to_collection["id"])),
                 ),
                 Option.KEY_NOT_EXIST_IGNORE_ANY,
@@ -196,7 +194,7 @@ class TmdbMetadataProvider(MetadataProvider[Movie]):
             for d in api.results
         ]
 
-    @apply.register
+    @apply.register(TvShow)
     def _(self, tvshow: TvShow, **kwargs) -> TvShow:
         m_id = kwargs["id_"]
 

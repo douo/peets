@@ -6,7 +6,7 @@ from pluggy import HookimplMarker, HookspecMarker, PluginManager
 
 from peets.config import NAME, Config
 from peets.nfo import Connector
-from peets.nfo.kodi import MovieKodiConnector
+from peets.nfo.kodi import CommonKodiConnector
 from peets.scraper import Feature, MetadataProvider, Provider
 from peets.tmdb import TmdbArtworkProvider, TmdbMetadataProvider
 
@@ -38,14 +38,14 @@ def get_connectors(  # type: ignore[return,empty-body]
 @impl(specname="get_providers")
 def get_providers_impl(config: Config) -> Provider | tuple[Provider, ...]:
     return (
-        TmdbArtworkProvider(config.lang, config.country),
-        TmdbMetadataProvider(config.lang, config.country),
+        TmdbArtworkProvider(config),
+        TmdbMetadataProvider(config),
     )
 
 
 @impl(specname="get_connectors")
 def get_connectors_impl(config: Config) -> Connector | tuple[Connector, ...]:
-    return MovieKodiConnector()
+    return CommonKodiConnector(config)
 
 
 def _flat(result: T | list[T | tuple[T]]) -> list[T]:

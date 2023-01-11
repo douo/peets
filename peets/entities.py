@@ -671,3 +671,4 @@ class TvShowEpisode(MediaEntity):
     directors: list[Person] = field(default_factory=list)
     writers: list[Person] = field(default_factory=list)
     dummy: bool = False
+    watched: bool = False
