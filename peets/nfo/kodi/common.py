@@ -4,16 +4,16 @@ from typing import Callable, TypeVar, cast
 
 from lxml import etree as ET
 
-from peets.entities import MediaFileType, Movie, TvShow, TvShowSeason, Person, TvShowEpisode
+from peets.entities import MediaEntity, MediaFileType, Movie, TvShow, TvShowSeason, Person, TvShowEpisode
 from peets.nfo import Connector, NfoTable, _to_text, create_element
 from peets.config import Config
 
 T = TypeVar("T", Movie, TvShow)
 
 
-def _uniqueid(ids: dict) -> list[ET._Element]:
+def _uniqueid(ids: dict, default: str = "tmdb") -> list[ET._Element]:
     return [
-        create_element("uniqueid", str(v), **{"type": k, "default": str(k == "tmdb")})
+        create_element("uniqueid", str(v), **{"type": k, "default": str(k == default)})
         for k, v in ids.items()
     ]
 
@@ -30,12 +30,85 @@ def _studio(production_company) -> list[ET._Element]:
     return [create_element("studio", c) for c in production_company.split(",")]
 
 
+def _ratings(ratings) -> ET._Element:
+    parent = ET.Element("ratings")
+
+    for id_, rating in ratings.items():
+        if id_ == "user":
+            continue
+        r = ET.SubElement(parent, "rating")
+        if id_ == "tmdb":
+            r.set("name", "themoviedb")
+            r.set("default", "true")
+        else:
+            r.set("name", id_)
+            r.set("default", "false")
+        r.set("max", _to_text(rating.max_value))
+        ET.SubElement(r, "value").text = "{:.1f}".format(rating.rating)
+        ET.SubElement(r, "votes").text = _to_text(rating.votes)
+
+    return parent
+
+
+def _tags(tags) -> list[ET._Element]:
+    return [create_element("tag", t) for t in tags]
+
+
+def _credits(ele: str, attr: str) -> Callable[[MediaEntity], list[ET._Element]]:
+    def _inner(entity: MediaEntity) -> list[ET._Element]:
+        result = []
+        for p in entity.__getattribute__(attr):
+            child = ET.Element("credits")
+            child.text = p.name
+            if "tmdb" in p.ids:
+                child.set("tmdbid", str(p.ids["tmdb"]))
+            if "imdb" in p.ids:
+                child.set("imdbid", str(p.ids["imdb"]))
+            if "tvdb" in p.ids:
+                child.set("tvdb", str(p.ids["tvdb"]))
+            result.append(child)
+        return result
+
+    return _inner
+
+
+def _actor(actors: list[Person]) -> list[ET._Element]:
+    result = []
+    for p in actors:
+        actor = ET.Element("actor")
+        name = ET.SubElement(actor, "name")
+
+        name.text = p.name
+
+        if p.role:
+            child = ET.SubElement(actor, "role")
+            child.text = p.role
+        if p.thumb_url:
+            child = ET.SubElement(actor, "thumb")
+            child.text = p.thumb_url
+        if p.profile_url:
+            child = ET.SubElement(actor, "profile")
+            child.text = p.profile_url
+
+        if "tmdb" in p.ids:
+            actor.set("tmdbid", str(p.ids["tmdb"]))
+        if "imdb" in p.ids:
+            actor.set("imdbid", str(p.ids["imdb"]))
+        if "tvdb" in p.ids:
+            actor.set("tvdb", str(p.ids["tvdb"]))
+        result.append(actor)
+
+    return result
+
+
+
+
+
 class CommonKodiConnector(Connector[T]):
     def __init__(self, config: Config) -> None:
         super().__init__("kodi")
         self.tmdb_key = config.tmdb_key
         self.language = config.language
-
 
     @property
     def available_type(self) -> list[str]:
@@ -47,23 +120,6 @@ class CommonKodiConnector(Connector[T]):
 
     @nfo_table.register
     def _(self, movie: Movie) -> NfoTable:
-        def _credits(ele: str, attr: str) -> Callable[[Movie], list[ET._Element]]:
-            def _inner(movie: Movie) -> list[ET._Element]:
-                result = []
-                for p in movie.__getattribute__(attr):
-                    child = ET.Element("credits")
-                    child.text = p.name
-                    if "tmdb" in p.ids:
-                        child.set("tmdbid", str(p.ids["tmdb"]))
-                    if "imdb" in p.ids:
-                        child.set("imdbid", str(p.ids["imdb"]))
-                    if "tvdb" in p.ids:
-                        child.set("tvdb", str(p.ids["tvdb"]))
-                    result.append(child)
-                return result
-
-            return _inner
-
         def _actors(ele: str, attr: str) -> Callable[[Movie], list[ET._Element]]:
             def _inner(movie: Movie) -> list[ET._Element]:
                 result = []
@@ -85,9 +141,7 @@ class CommonKodiConnector(Connector[T]):
 
                     if "tmdb" in p.ids:
                         actor.set("tmdbid", str(p.ids["tmdb"]))
-
-
-                        if "imdb" in p.ids:
+                    if "imdb" in p.ids:
                         actor.set("imdbid", str(p.ids["imdb"]))
                     if "tvdb" in p.ids:
                         actor.set("tvdb", str(p.ids["tvdb"]))
@@ -113,11 +167,6 @@ class CommonKodiConnector(Connector[T]):
 
         return self.common(movie) + [
             ("sorttitle", "sort_title"),
-            ("mpaa", lambda certification: certification.mpaa()),
-            (
-                "certification",
-                lambda certification: certification.certification,
-            ),
             (
                 "rating",  # TODO copy from tvshow
                 lambda ratings: "{:.1f}".format(
@@ -159,25 +208,6 @@ class CommonKodiConnector(Connector[T]):
 
     @nfo_table.register
     def _(self, tvshow: TvShow) -> NfoTable:
-        def _ratings(ratings) -> ET._Element:
-            parent = ET.Element("ratings")
-
-            for id_, rating in ratings.items():
-                if id_ == "user":
-                    continue
-                r = ET.SubElement(parent, "rating")
-                if id_ == "tmdb":
-                    r.set("name", "themoviedb")
-                    r.set("default", "true")
-                else:
-                    r.set("name", id_)
-                    r.set("default", "false")
-                r.set("max", _to_text(rating.max_value))
-                ET.SubElement(r, "value").text = "{:.1f}".format(rating.rating)
-                ET.SubElement(r, "votes").text = _to_text(rating.votes)
-
-            return parent
-
         def _thumb(type_: MediaFileType, aspect=None) -> Callable:
             aspect = aspect or type_.name.lower()
 
@@ -240,37 +270,6 @@ class CommonKodiConnector(Connector[T]):
 
             return inner
 
-        def _tags(tags) -> list[ET._Element]:
-            return [create_element("tag", t) for t in tags]
-
-        def _actor(actors: list[Person]) -> list[ET._Element]:
-            result = []
-            for p in actors:
-                actor = ET.Element("actor")
-                name = ET.SubElement(actor, "name")
-
-                name.text = p.name
-
-                if p.role:
-                    child = ET.SubElement(actor, "role")
-                    child.text = p.role
-                if p.thumb_url:
-                    child = ET.SubElement(actor, "thumb")
-                    child.text = p.thumb_url
-                if p.profile_url:
-                    child = ET.SubElement(actor, "profile")
-                    child.text = p.profile_url
-
-                if "tmdb" in p.ids:
-                    actor.set("tmdbid", str(p.ids["tmdb"]))
-                if "imdb" in p.ids:
-                    actor.set("imdbid", str(p.ids["imdb"]))
-                if "tvdb" in p.ids:
-                    actor.set("tvdb", str(p.ids["tvdb"]))
-                result.append(actor)
-
-            return result
-
 
         def _watched(episodes: list[TvShowEpisode]) -> bool:
             found = False
@@ -328,16 +327,14 @@ class CommonKodiConnector(Connector[T]):
             ),
             ("id", lambda ids: ids["imdb"]),
             ("tmdbid", lambda ids: ids["tmdb"]),
-            # uniqueid
             _uniqueid,
-            # country
             _country,
             (
                 "dateadded",
                 lambda date_added: date_added.strftime("%Y-%m-%d %H:%M:%S"),
             ),  # TODO MovieGenericXmlConnector#addDateAdded
             (
-                "lockdate",
+                "lockdata",
                 lambda: "true",
             ),  # protect the NFO from being modified by Emby
             ("playcount", lambda: 0),  # TODO

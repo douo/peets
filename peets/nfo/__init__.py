@@ -14,24 +14,37 @@ from peets.util.type_utils import check_iterable_type
 T = TypeVar("T", bound=MediaEntity)
 
 
+def _tostring(doc: ET._Element) -> str:
+    return ET.tostring(
+        doc,
+        pretty_print=True,
+        xml_declaration=True,
+        encoding="UTF-8",
+        standalone=True,
+    )
+
+def pprint(doc: ET._Element):
+    import pprint
+    pprint.PrettyPrinter(indent=4).pprint(_tostring(doc).decode("UTF-8"))
+
+
+def write_to(doc: ET._Element):
+    text = _tostring(doc)
+    # TODO
+
 class Connector(ABC, Generic[T]):
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def generate(self, media: T) -> str:
+    def generate(self, media: T, wrap=True) -> ET._Element:
         root = ET.Element(self.get_root_name(media))
-        root.addprevious(ET.Comment(f"created on {datetime.now().isoformat()}"))
-        doc = ET.ElementTree(root)
-
         inflate(root, media, self.nfo_table(media))
+        if wrap:
+            root.addprevious(ET.Comment(f"created on {datetime.now().isoformat()}"))
+            return ET.ElementTree(root)
+        else:
+            return root
 
-        return ET.tostring(
-            doc,
-            pretty_print=True,
-            xml_declaration=True,
-            encoding="UTF-8",
-            standalone=True,
-        )
 
     def get_root_name(self, media: T) -> str:
         return type(media).__name__.lower()

@@ -12,12 +12,12 @@ from peets.entities import (
 from peets.iso import Country, Language
 from peets import manager, get_config
 from peets.tmdb import TmdbMetadataProvider
+from peets.nfo import pprint
 
 
 def test_detail(hijack, dummy):
     # m = dummy(Movie)  # FIXME buggy
-    import pprint
-    print = pprint.PrettyPrinter(indent=4).pprint
+    print = pprint
     data = hijack("movie.json")
     tmdb = TmdbMetadataProvider(get_config())
     m = tmdb.apply(Movie(), id_=0)
