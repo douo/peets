@@ -6,7 +6,7 @@ from pluggy import HookimplMarker, HookspecMarker, PluginManager
 
 from peets.config import NAME, Config
 from peets.nfo import Connector
-from peets.nfo.kodi import CommonKodiConnector
+from peets.nfo.kodi import TvShowKodiConnector, MovieKodiConnector, TvShowEpisodeKodiConnector
 from peets.scraper import Feature, MetadataProvider, Provider
 from peets.tmdb import TmdbArtworkProvider, TmdbMetadataProvider
 
@@ -45,15 +45,17 @@ def get_providers_impl(config: Config) -> Provider | tuple[Provider, ...]:
 
 @impl(specname="get_connectors")
 def get_connectors_impl(config: Config) -> Connector | tuple[Connector, ...]:
-    return CommonKodiConnector(config)
+    return (TvShowKodiConnector(config),
+            MovieKodiConnector(config),
+            TvShowEpisodeKodiConnector(config))
 
 
 def _flat(result: T | list[T | tuple[T]]) -> list[T]:
     if isinstance(result, list):
         data = []
         for i in result:
-            if isinstance(result, tuple):
-                data += cast(list[T], i)
+            if isinstance(i, tuple):
+                data += list(cast(tuple[T], i))
             else:
                 data.append(i)
         return data
@@ -79,13 +81,6 @@ class Plugin:
     def get_providers(self) -> list[Provider]:
         return _flat(self.manager.hook.get_providers(config=self.config))
 
-    @cache
-    def get_connectors(self) -> list[Connector]:
-        return _flat(self.manager.hook.get_connectors(config=self.config))
-
-    def connectors(self, media: T) -> list[Connector[T]]:
-        return [c for c in self.get_connectors() if c.is_available(media)]
-
     def metadata(self, media: T) -> list[MetadataProvider[T]]:
         return [
             p
@@ -99,3 +94,10 @@ class Plugin:
             for p in self.get_providers()
             if p.is_available(media) and Feature.Artwork in p.features
         ]
+
+    @cache
+    def get_connectors(self) -> list[Connector]:
+        return _flat(self.manager.hook.get_connectors(config=self.config))
+
+    def connectors(self, media: T) -> list[Connector[T]]:
+        return [c for c in self.get_connectors() if c.is_available(media)]

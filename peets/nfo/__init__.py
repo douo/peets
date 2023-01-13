@@ -37,8 +37,8 @@ class Connector(ABC, Generic[T]):
         self.name = name
 
     def generate(self, media: T, wrap=True) -> ET._Element:
-        root = ET.Element(self.get_root_name(media))
-        inflate(root, media, self.nfo_table(media))
+        root = ET.Element(self._get_root_name(media))
+        inflate(root, media, self._nfo_table(media))
         if wrap:
             root.addprevious(ET.Comment(f"created on {datetime.now().isoformat()}"))
             return ET.ElementTree(root)
@@ -46,11 +46,11 @@ class Connector(ABC, Generic[T]):
             return root
 
 
-    def get_root_name(self, media: T) -> str:
+    def _get_root_name(self, media: T) -> str:
         return type(media).__name__.lower()
 
     @abstractmethod
-    def nfo_table(self, media: T) -> NfoTable:
+    def _nfo_table(self, media: T) -> NfoTable:
         pass
 
     @property
@@ -135,7 +135,6 @@ def _process_callable(conv: FunctionType, root: ET._Element, entity: MediaEntity
 
     type_hints = get_type_hints(type(entity))
     entity_type = type(entity).__name__.lower()
-    print(f"{entity_type=}")
 
     def _to_param(arg: str, annt: type | None):
         if arg == "root" and annt is ET._Element:

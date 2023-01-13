@@ -32,3 +32,7 @@ def test_detail(hijack, dummy):
 
     c = manager.connectors(m)[0]
     print(c.generate(m))
+
+    for e in m.episodes:
+        c = manager.connectors(e)[0]
+        print(c.generate(e))
