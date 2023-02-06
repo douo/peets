@@ -227,7 +227,7 @@ def _do_guess_episode(path: Path, addon: dict | None = None) -> list[tuple[Path,
         addon = guessit(path)
     addon["media_files"] = mfs
     addon["original_filename"] = path.name
-    if isinstance(addon["episode"], list):
+    if isinstance(addon.get("episode"), list):  # 允许 episode 不存在
         # multiple episode in single file
         def split_episodes(e) -> dict:
             new_addon = addon.copy()

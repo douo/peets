@@ -73,6 +73,8 @@ class Option(Flag):
     KEY_NOT_EXIST_AS_NONE = auto()
     KEY_NOT_EXIST_IGNORE_ANY = auto()
     KEY_NOT_EXIST_IGNORE_ALL = auto()
+    VALUE_NONE_IGNORE_ANY = auto()
+    VALUE_NONE_IGNORE_ALL = auto()
 
 
 ConvertTable: TypeAlias = list["Converter"]
@@ -232,7 +234,9 @@ def to_kwargs(
                         and sub_table is not None
                         and check_iterable_type(v, dict)
                     ):
-                        old += [to_kwargs(f_item_mergeable_type, i, sub_table) for i in v]
+                        old += [
+                            to_kwargs(f_item_mergeable_type, i, sub_table) for i in v
+                        ]
                     else:
                         raise TypeNotMatch(
                             f"Get Type {v_type}, except {attr} type is {f_type}"
@@ -308,18 +312,26 @@ def _option_key_guard(converter: Converter, addon: dict) -> bool:
     """
     option = converter[2] if len(converter) > 2 else Option.KEY_NOT_EXIST_AS_NONE
     src = _convert_src_to_keys(converter[1])
+
     if Option.KEY_NOT_EXIST_RAISE in option:
         for key in src:
             if key not in addon:
                 raise KeyError(f"{key=} not in {addon=}")
-    elif Option.KEY_NOT_EXIST_IGNORE_ALL in option:
-        return all(k not in addon for k in src)
-    elif Option.KEY_NOT_EXIST_IGNORE_ANY in option:
-        return any(k not in addon for k in src)
-    elif Option.KEY_NOT_EXIST_AS_NONE in option:
-        return False
-    else:
-        raise ValueError(f"Unknown {option=}")
+    elif Option.KEY_NOT_EXIST_IGNORE_ALL in option and all(k not in addon for k in src):
+        return True
+    elif Option.KEY_NOT_EXIST_IGNORE_ANY in option and any(k not in addon for k in src):
+        return True
+    elif Option.VALUE_NONE_IGNORE_ALL in option and all(
+        addon.get(k) is None for k in src
+    ):
+        return True
+    elif Option.VALUE_NONE_IGNORE_ANY in option and any(
+        addon.get(k) is None for k in src
+    ):
+        return True
+    # elif Option.KEY_NOT_EXIST_AS_NONE in option:
+    return False
+
 
 
 def _preprocess_converter(converter: Converter, addon: dict):

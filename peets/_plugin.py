@@ -6,29 +6,37 @@ from pluggy import HookimplMarker, HookspecMarker, PluginManager
 
 from peets.config import NAME, Config
 from peets.nfo import Connector
-from peets.nfo.kodi import TvShowKodiConnector, MovieKodiConnector, TvShowEpisodeKodiConnector
+from peets.nfo.kodi import (
+    MovieKodiConnector,
+    TvShowEpisodeKodiConnector,
+    TvShowKodiConnector,
+)
 from peets.scraper import Feature, MetadataProvider, Provider
 from peets.tmdb import TmdbArtworkProvider, TmdbMetadataProvider
+from peets.ui import MediaUI, MovieUI, TvShowEpisodeUI, TvShowUI
+from peets.entities import MediaEntity
 
 # 保留函数的 type annotations
 _F = TypeVar("_F", bound=Callable[..., Any])
 _spec_marker = HookspecMarker(NAME)
 impl = HookimplMarker(NAME)
 T = TypeVar("T")
+E = TypeVar("E", bound=MediaEntity)
+U = MediaUI[Any]
 
 
-def _spec(func: _F) -> _F:
+def spec(func: _F) -> _F:
     return cast(_F, _spec_marker(func))
 
 
-@_spec
+@spec
 def get_providers(  # type: ignore[return,empty-body]
     config: Config,
 ) -> Provider | tuple[Provider, ...]:
     pass
 
 
-@_spec
+@spec
 def get_connectors(  # type: ignore[return,empty-body]
     config: Config,
 ) -> Connector | tuple[Provider, ...]:
@@ -45,9 +53,21 @@ def get_providers_impl(config: Config) -> Provider | tuple[Provider, ...]:
 
 @impl(specname="get_connectors")
 def get_connectors_impl(config: Config) -> Connector | tuple[Connector, ...]:
-    return (TvShowKodiConnector(config),
-            MovieKodiConnector(config),
-            TvShowEpisodeKodiConnector(config))
+    return (
+        TvShowKodiConnector(config),
+        MovieKodiConnector(config),
+        TvShowEpisodeKodiConnector(config),
+    )
+
+
+@spec
+def provide_uis() -> type[U] | tuple[type[U], ...]:  # type: ignore[return,empty-body]
+    pass
+
+
+@impl(specname="provide_uis")
+def provide_uis_impl() -> type[U] | tuple[type[U], ...]:
+    return (MovieUI, TvShowUI, TvShowEpisodeUI)
 
 
 def _flat(result: T | list[T | tuple[T]]) -> list[T]:
@@ -81,14 +101,14 @@ class Plugin:
     def get_providers(self) -> list[Provider]:
         return _flat(self.manager.hook.get_providers(config=self.config))
 
-    def metadata(self, media: T) -> list[MetadataProvider[T]]:
+    def metadata(self, media: E) -> list[MetadataProvider[E]]:
         return [
             p
             for p in self.get_providers()
             if p.is_available(media) and isinstance(p, MetadataProvider)
         ]
 
-    def artwork(self, media: T) -> list[Provider[T]]:
+    def artwork(self, media: E) -> list[Provider[E]]:
         return [
             p
             for p in self.get_providers()
@@ -99,5 +119,10 @@ class Plugin:
     def get_connectors(self) -> list[Connector]:
         return _flat(self.manager.hook.get_connectors(config=self.config))
 
-    def connectors(self, media: T) -> list[Connector[T]]:
+    def connectors(self, media: E) -> list[Connector[E]]:
         return [c for c in self.get_connectors() if c.is_available(media)]
+
+    def get_ui(self, type_: type[E]) -> type[U]:
+        uis = provide_uis_impl()
+        target = f"{type_.__name__}UI"
+        return next(u for u in uis if u.__name__ == target)

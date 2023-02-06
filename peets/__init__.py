@@ -1,4 +1,4 @@
-from peets._plugin import Plugin, impl
+from peets._plugin import Plugin, impl, spec
 from peets.config import Config
 
 _config = Config()

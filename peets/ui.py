@@ -7,7 +7,7 @@ import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import replace as data_replace
 from enum import Enum
-from functools import partial
+from functools import cache, partial
 from pathlib import Path
 from typing import Any, Callable, Generic, Iterable, TypeVar, get_type_hints
 
@@ -15,8 +15,7 @@ import requests
 from teletype.components import ChoiceHelper, SelectOne
 from teletype.io import get_key, style_input
 
-import peets.naming as naming
-from peets import manager
+import peets.naming
 from peets.entities import MediaEntity, MediaFileType, Movie, TvShow, TvShowEpisode
 from peets.merger import replace
 from peets.scraper import MetadataProvider, Provider
@@ -101,7 +100,10 @@ class TvShowEpisodeUI(MediaUI[TvShowEpisode]):
         return []
 
 
-_ui_maps: dict[str, MediaUI] = {"Movie": MovieUI(), "TvShow": TvShowUI()}
+@cache
+def get_ui(type_: type[T]) -> MediaUI[Any]:
+    from peets import manager  # FIXME 循环依赖
+    return manager.get_ui(type_)()
 
 
 def interact(media: MediaEntity, lib_path: Path, naming_style: str) -> Action:
@@ -212,7 +214,7 @@ def _hint(ops: list[ChoiceHelper], label: str) -> Any:
     print()
     print(header)
 
-    return SelectOne(ops).prompt()
+    return SelectOne(ops).prompt("=" * width)
 
 
 def _modify(media: T, attr: str) -> T:
@@ -228,7 +230,7 @@ def _modify(media: T, attr: str) -> T:
 
 
 def do_edit(media: T) -> T:
-    ui = _ui_maps[type(media).__name__]
+    ui = get_ui(type(media))
     return _select(media, ui.edit_ops() + [("edit by Field", _edit_by_field)], "Edit")
 
 
@@ -269,7 +271,7 @@ def do_view(media: T):
 def _view_by_field(media: T):
     def _type_filter(type_: type) -> bool:
         return type_ in [bool, int, float, str, list, dict, tuple]
-    breakpoint()
+
     fs = [f for f in get_type_hints(type(media)).items() if _type_filter(f[1])]
 
     def _print_field(media: T, attr: tuple[str, type]):
@@ -305,7 +307,7 @@ def _select(media: T, ops: list[Op], label: str) -> T:
 
 
 def _brief(media: MediaEntity):
-    ui = _ui_maps[type(media).__name__]
+    ui = get_ui(type(media))
     ui.brief(media)
 
 
@@ -345,11 +347,13 @@ def do_search(media: MediaEntity):
             )
             for s in result
         ]
+        choices += _to_choices([("Cancel", Action.QUIT)])
         pick = SelectOne(choices).prompt()
-        print("Fetching...")
-        new_ = scraper.apply(media, id_=pick.id_)
-        scraper = _pick_metadata_scraper(media)
-        return scraper.apply(new_)
+        if pick == Action.QUIT:
+            print("Cancel")
+        else:
+            print("Fetching...")
+            return scraper.apply(media, id_=pick.id_)
     else:
         print("Not Found!")
 

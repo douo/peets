@@ -167,7 +167,7 @@ class TmdbMetadataProvider(MetadataProvider[Movie]):
                     ),
                     ("tmdbSet", str(belongs_to_collection["id"])),
                 ),
-                Option.KEY_NOT_EXIST_IGNORE_ANY,
+                Option.VALUE_NONE_IGNORE_ALL,
             ),
             ("tags", lambda keywords: [k["name"] for k in keywords["keywords"]]),
         ]
