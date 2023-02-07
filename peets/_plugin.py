@@ -13,7 +13,7 @@ from peets.nfo.kodi import (
 )
 from peets.scraper import Feature, MetadataProvider, Provider
 from peets.tmdb import TmdbArtworkProvider, TmdbMetadataProvider
-from peets.ui import MediaUI, MovieUI, TvShowEpisodeUI, TvShowUI
+from peets.ui.action import MediaUI, MovieUI, TvShowUI
 from peets.entities import MediaEntity
 
 # 保留函数的 type annotations
@@ -67,7 +67,7 @@ def provide_uis() -> type[U] | tuple[type[U], ...]:  # type: ignore[return,empty
 
 @impl(specname="provide_uis")
 def provide_uis_impl() -> type[U] | tuple[type[U], ...]:
-    return (MovieUI, TvShowUI, TvShowEpisodeUI)
+    return (MovieUI, TvShowUI)
 
 
 def _flat(result: T | list[T | tuple[T]]) -> list[T]:

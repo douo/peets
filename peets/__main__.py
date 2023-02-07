@@ -6,7 +6,8 @@ from typing import Iterator
 from peets.entities import MediaEntity, Movie
 from peets.finder import traverse
 from peets.guessit import NonMedia, create_entity
-from peets.ui import interact, Action
+from peets.ui.ui import interact
+from peets.ui.action import Action
 from itertools import chain, filterfalse
 from os import getcwd
 

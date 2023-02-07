@@ -643,6 +643,11 @@ class TvShow(MediaEntity):
                 return e
         return None
 
+    def episode_groupby_season() -> dict[int, list["TvShowEpisode"]]:
+        e_sorted = sorted(media.episodes, key  = lambda x: (x.season, x.episode))
+        groups = groupby(e_sorted, attrgetter("season"))
+
+
 
 @dataclass(kw_only=True)
 class TvShowSeason:
