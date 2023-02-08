@@ -1,13 +1,32 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import date
+import json
+from dataclasses import dataclass, field, is_dataclass, asdict
+from datetime import datetime, date
 from enum import Enum, auto
 from pathlib import Path
-from typing import TypeAlias
+from typing import TypeAlias, Iterator
 from uuid import UUID, uuid4
+from itertools import groupby
+from operator import attrgetter
 
 from peets.iso import Country
+
+
+class EntityJsonEncoder(json.JSONEncoder):
+    def default(self, o):
+        if is_dataclass(o):
+            return asdict(o)
+        elif isinstance(o, Enum):
+            return o.name
+        elif isinstance(o, Path):
+            return str(Path)
+        elif isinstance(o, UUID):
+            return str(o)
+        elif isinstance(o, (datetime, date)):
+            return o.isoformat()
+        else:
+            return super().default(o)
 
 
 class MediaCertification(Enum):
@@ -499,7 +518,7 @@ class MediaArtwork:
 
 @dataclass(kw_only=True)
 class MediaEntity:
-    dbid: UUID = uuid4()
+    dbid: UUID = field(default_factory=uuid4)
     locked: bool = False  # ignore
     data_source: str = ""  # TODO 暂时没有 data_source 的概念，可以存放首次发现的目录？
     ids: dict[str, str] = field(default_factory=dict)  # TODO 通过 key 来选择 scrapper
@@ -508,7 +527,7 @@ class MediaEntity:
     year: int = 0
     plot: str = ""
     path: str = ""
-    date_added: date = date.today()
+    date_added: date = field(default_factory=date.today)
     production_company: str = ""
     scraped: bool = False
     note: str = ""
@@ -530,6 +549,9 @@ class MediaEntity:
 
     def has_media_file(self, type_: MediaFileType) -> bool:
         return any(t for t, p in self.media_files if t is type_)
+
+    def to_json(self):
+        return json.dumps(self, cls=EntityJsonEncoder, indent=2)
 
 
 @dataclass
@@ -635,6 +657,8 @@ class TvShow(MediaEntity):
     trailer: list[MediaTrailer] = field(default_factory=list)
     # 不用 dict 方便修改 season
     episodes: list[TvShowEpisode] = field(default_factory=list)
+    # FIXME: 表示 TvShow 自身的元数据，不是本地文件的数据
+    # tmdb 填充后才有数据，修改 episodes 不会动态更新该值
     seasons: list[TvShowSeason] = field(default_factory=list)
 
     def retrieve_episode(self, season: int, episode: int) -> "TvShowEpisode" | None:
@@ -643,9 +667,10 @@ class TvShow(MediaEntity):
                 return e
         return None
 
-    def episode_groupby_season() -> dict[int, list["TvShowEpisode"]]:
-        e_sorted = sorted(media.episodes, key  = lambda x: (x.season, x.episode))
-        groups = groupby(e_sorted, attrgetter("season"))
+    def episode_groupby_season(self) -> Iterator[tuple[int, Iterator["TvShowEpisode"]]]:
+        e_sorted = sorted(self.episodes, key  = lambda x: (x.season, x.episode))
+        return groupby(e_sorted, attrgetter("season"))
+
 
 
 

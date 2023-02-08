@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import os
+import json
 import readline
 import tempfile
 from abc import ABC, abstractmethod
-from dataclasses import replace as data_replace
+from dataclasses import asdict, replace as data_replace
 from enum import Enum
-from functools import partial, chain
-from itertools import groupby
+from functools import partial
+from itertools import groupby, chain
 from pathlib import Path
 from typing import Callable, Generic, Iterable, TypeVar, get_type_hints
 
 import requests
-from teletype.components import ChoiceHelper, SelectOne
+from teletype.components import ChoiceHelper, SelectOne, SelectMany
 from teletype.io import get_key, style_input
 from operator import attrgetter
 
@@ -20,6 +21,7 @@ from peets.entities import MediaEntity, MediaFileType, Movie, TvShow, TvShowEpis
 from peets.merger import replace
 from peets.scraper import MetadataProvider, Provider
 from peets.util.type_utils import check_iterable_type, is_assignable
+
 
 
 class Action(Enum):
@@ -77,9 +79,10 @@ class TvShowUI(MediaUI[TvShow]):
         for mf in media.media_files:
             print(f"{mf[0].name}: {mf[1]}")
 
-        for (k, v) in meida.episode_groupby_season():
-            e_list = ",".join([str(e.episode) for e in v])
-            print(f"Season {k}({len(e_list)}): {e_list}")
+        for (k, v) in media.episode_groupby_season():
+            e_list = [str(e.episode) for e in v]
+            text = ",".join(e_list)
+            print(f"Season {k}({len(e_list)}): {text}")
 
 
     def ops(self) -> list[Op]:
@@ -87,19 +90,77 @@ class TvShowUI(MediaUI[TvShow]):
             search_op(),
             fill_op(),
             edit_op([modify_op("title"), modify_op("year")]),
-            view_op()
+            view_op(),
+            ("List...", list_season)
         ]
 
-    def list_episode(media: TvShow):
-        groups = meida.episode_groupby_season()
+def list_season(media: TvShow)-> TvShow:
+    def _ops(media: TvShow) -> list[Op]:
+        seasons = [k for (k, _) in media.episode_groupby_season()]
+        all_ = [("All", list_episode("all"))]
+        return [(f"Season {k}", list_episode(k))  for k in seasons] + all_
 
-        all_ = [("All", list(chain(*groups.values())))]
-        ops = [(f"Season {k}", v)  for (k, v) in groups] + all_
-        pick = _select(ops, "Season")
+    return select(media, _ops, "Season")
+
+
+def list_episode(season_tag: int | str):
+    def _inner(media: TvShow) -> TvShow:
+        def _ops(media: TvShow) -> list[Op]:
+            groups = media.episode_groupby_season()
+            if season_tag == "all":
+                episodes = list(chain(*[list(v) for (_, v) in groups]))
+            else:
+                episodes = next(v for (k, v) in groups if k == season_tag)
+            ops = [(f"S{e.season}E{e.episode}:{e.main_video().name}", view_episode(e)) for e in episodes]
+            ops.append(("batch edit Season...", batch_edit_season(season_tag)))
+            return ops
+
+        return select(media, _ops, f"Season {season_tag}")
+    return _inner
+
+def batch_edit_season(season_tag: int | str):
+    def _inner(media: TvShow) -> TvShow:
+        def _ops(media: TvShow) -> list[Op]:
+            groups = media.episode_groupby_season()
+            if season_tag == "all":
+                episodes = list(chain(*[list(v) for (_, v) in groups]))
+            else:
+                episodes = next(v for (k, v) in groups if k == season_tag)
+            return [(f"S{e.season}E{e.episode}:{e.main_video().name}", e) for e in episodes]
+
+        while True:
+            pick = hint(parse_ops(_ops(media)), "Batch Edit Season", select_many=True)
+            if pick:
+                value = style_input(f"Season:", style=["blue", "bold"])
+                breakpoint()
+                new_es = [replace(e, {"season": int(value)}) if e in pick else e for e in media.episodes]
+                media = replace(media,
+                               {"episodes": new_es})
+            else:
+                return media
+
+    return _inner
+
+
+def view_episode(episode: TvShowEpisode) -> TvShowEpisodeUI:
+    def _inner(media: TvShow) -> TvShow:
+        ui =  TvShowEpisodeUI(media)
+        ops = ui.ops()
+        new_e = select(episode, ops, "Action", ui = ui)
+        if new_e != episode:
+            new_es = [(new_e if e.dbid == new_e.dbid else e) for e in media.episodes ]
+            return replace(media,
+                           {"episodes": new_es})
+        else:
+            return media
+    return _inner
 
 
 
 class TvShowEpisodeUI(MediaUI[TvShowEpisode]):
+    def __init__(self, tvshow:Tvshow):
+        self.tvshow = tvshow
+
     def brief(self, media: TvShowEpisode):
         print(f"Type: {type(media).__name__}")
         print(f"Title: {media.title}")
@@ -117,78 +178,108 @@ class TvShowEpisodeUI(MediaUI[TvShowEpisode]):
             view_op()
         ]
 
-def parse_ops(ops: list[Op]) -> list[ChoiceHelper[OpCallable | OpResult]]:
-    return _to_choices(ops)
+def parse_ops(ops: list[Op], last_first=False) -> list[ChoiceHelper[OpCallable | OpResult]]:
+    return _to_choices(ops, last_first)
 
 
-def _to_choices(ops: list[tuple[str, R]]) -> list[ChoiceHelper[R]]:
+def _to_choices(ops: list[tuple[str, R]], last_first=False) -> list[ChoiceHelper[R]]:
     """
-    1. 选择快捷键，按 op 顺序应用如下优先级：
+    1. 自动生成快捷键，按 op 顺序应用如下优先级：
      - 第一个大写字母
      - 第一个字母
      - 第 n 个字母
      - 第一个大写字母/第一个字母的字母表顺序
      - 不支持快捷键
     """
-    ...
 
     def _first_key(s) -> str:
         try:
-            return next(c for c in s if c.isupper())
+            return next(c.lower() for c in s if c.isupper())
         except StopIteration:
             return next(c for c in s if c.isalpha())
-    keys = []
-    for op in ops:
-        dsc = op[0]
-        best = _first_key(dsc).lower()
-        if best not in keys:
-            keys.append(best)
-            continue
-        else:
-            # 第一个  alpha 可能被比较两次
-            try:
-                keys.append(next(c for c in dsc if c.isalpha() and c not in keys))
+
+    def _generate_mnemonic(ops: list[tuple[str, R]], exclude=[]) -> list[ChoiceHelper[R]]:
+        keys = list(exclude)
+        for op in ops:
+            dsc = op[0]
+            best = _first_key(dsc)
+            if best not in keys:
+                keys.append(best)
                 continue
-            except StopIteration:
-                pass
-        # 字母表顺序
-        found = False
-        for i in range(ord(best) + 1, ord("z") + 1):
-            c = chr(i)
-            if c not in keys:
-                keys.append(c)
-                found = True
-                break
-        # 找不到的占位符
-        if not found:
-            keys.append(" ")
+            else:
+                dsc = dsc.lower()
+                # 第一个  alpha 可能被比较两次
+                try:
+                    keys.append(next(c for c in dsc if c.isalpha() and c not in keys))
+                    continue
+                except StopIteration:
+                    pass
+            # 字母表顺序
+            found = False
+            for i in range(ord(best) + 1, ord("z") + 1):
+                c = chr(i)
+                if c not in keys:
+                    keys.append(c)
+                    found = True
+                    break
+            # 找不到的占位符
+            if not found:
+                keys.append("\0")
+
+        return keys[len(exclude):]
+
+
+    last_op = ops[-1:] if last_first else []
+    _ops = ops[:-1] if last_first else ops
+    last_key = _generate_mnemonic(last_op)
+    keys = _generate_mnemonic(_ops, last_key) + last_key
 
     return [
-        ChoiceHelper(
-            v[1], label=v[0], mnemonic_style=["green", "bold", "underline"], mnemonic=k
-        )
-        for k, v in zip(keys, ops)
-    ]
+            ChoiceHelper(
+                v[1], label=v[0], mnemonic_style=["green", "bold", "underline"], mnemonic=k
+            )
+            for k, v in zip(keys, ops)
+        ]
 
 
 
-def _select(media: T, ops: list[Op], label: str) -> T:
+
+def select(media: T, ops: list[Op] | Callable[[T], list[Op]], label: str, quit_label = "Back", ui: MediaUI | None = None) -> T:
     """
     生成一个可返回的选择菜单
     """
-    ops_ = parse_ops(ops + [("Back", Action.QUIT)])
+    def _build_ops() -> list[Op]:
+        if callable(ops):
+            _ops = ops(media)
+        else:
+            _ops = ops
+        if quit_label:
+            _ops = _ops + [(quit_label, Action.QUIT)]
+
+        return parse_ops(_ops, last_first=bool(quit_label))
+
+    if ui:
+        ui.brief(media)
     while True:
-        pick = hint(ops_, label)
+        pick = hint(_build_ops(), label)
         result = pick(media) if callable(pick) else pick
         match result:
             case MediaEntity():
                 media = result
+                if ui:
+                    ui.brief(media)
             case dict():
                 media = replace(media, **result)
-            case Action.QUIT:
+                if ui:
+                    ui.brief(media)
+            case Action.NEXT | Action.QUIT:
                 return media
+            case _:
+                if ui:
+                    ui.brief(media)
 
-def hint(ops: list[ChoiceHelper], label: str) -> Any:
+
+def hint(ops: list[ChoiceHelper], label: str, select_many=False) -> Any:
     width = os.get_terminal_size().columns
     padding = 1
     margin = 0
@@ -204,8 +295,10 @@ def hint(ops: list[ChoiceHelper], label: str) -> Any:
     )
     print()
     print(header)
-
-    return SelectOne(ops).prompt("=" * width)
+    if select_many:
+        return SelectMany(ops).prompt("=" * width)
+    else:
+        return SelectOne(ops).prompt("=" * width)
 
 
 
@@ -279,7 +372,7 @@ def modify_op(attr: str) -> Op:
 
 def edit_op(extends: list[Op] = []) -> Op:
     def do_edit(media: T) -> T:
-        return _select(media, extends + [("edit by Field", _edit_by_field)], "Edit")
+        return select(media, extends + [("edit by Field", _edit_by_field)], "Edit")
 
     return ("Edit...", do_edit)
 
@@ -296,21 +389,20 @@ def _edit_by_field(media: T) -> T:
         if is_assignable(type_, MediaEntity):
             return do_edit(value)
         elif is_assignable(type_, Iterable) and check_iterable_type(value, MediaEntity):
-            return _select([(m.title, do_view) for m in value], "Select Media")
+            return select([(m.title, do_view) for m in value], "Select Media")
         else:
             return _modify(media, attr[0])
 
-    return _select(
+    return select(
         media, [(f[0], partial(_edit_field, attr=f)) for f in fs], "View by Field"
     )
 
 def view_op():
     def do_view(media: T):
-        _select(
+        select(
             media,
             [
-                ("brief", _brief),
-                ("detail", lambda media: pp.pprint(media.__dict__)),
+                ("as Json", lambda m: print(m.to_json())),
                 ("view by Field", _view_by_field),
             ],
             "View",
@@ -332,9 +424,9 @@ def _view_by_field(media: T):
         if is_assignable(type_, MediaEntity):
             do_view(value)
         elif is_assignable(type_, Iterable) and check_iterable_type(value, MediaEntity):
-            _select([(m.title, do_view) for m in value], "Select Media")
+            select([(m.title, do_view) for m in value], "Select Media")
         else:
             print(f"{attr[0]}: {value}")
             get_key()
 
-    _select(media, [(f[0], partial(_print_field, attr=f)) for f in fs], "View by Field")
+    select(media, [(f[0], partial(_print_field, attr=f)) for f in fs], "View by Field")

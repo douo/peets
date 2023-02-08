@@ -14,7 +14,7 @@ from teletype.io import get_key, style_input
 
 import peets.naming
 from peets import manager
-from peets.ui.action import T, Action, Op, MediaUI, parse_ops, hint
+from peets.ui.action import T, Action, Op, MediaUI, parse_ops, select
 from peets.entities import MediaEntity, MediaFileType
 from peets.merger import replace
 from peets.scraper import MetadataProvider, Provider
@@ -28,35 +28,18 @@ def get_ui(type_: type[T]) -> MediaUI[Any]:
 
 def interact(media: MediaEntity, lib_path: Path, naming_style: str) -> Action:
     ui = get_ui(type(media))
-    ui.brief(media)
-    ops = parse_ops(
-        ui.ops() +
-        [
-            (
+    ops = ui.ops() + [
+        (
                 "Process",
                 partial(_do_process, lib_path=lib_path, naming_style=naming_style),
             ),
             ("Skip", Action.NEXT),
         ]
-    )
-    while True:
-        try:
-            pick = hint(ops, "Action")
-            result = pick(media) if callable(pick) else pick
-            match result:
-                case MediaEntity():
-                    media = result
-                    ui.brief(media)
-                case dict():
-                    media = replace(media, **result)
-                    ui.brief(media)
-                case Action.NEXT | Action.QUIT:
-                    return result
-                case _:
-                    ui.brief(media)
 
-        except KeyboardInterrupt:
-            return Action.QUIT
+    try:
+        select(media, ops, "Action", None, ui)
+    except KeyboardInterrupt:
+        return Action.QUIT
 
 
 def _do_process(media: MediaEntity, lib_path: Path, naming_style: str):
