@@ -1,3 +1,4 @@
+from enum import Enum, auto
 import stat
 from os import chmod
 from pathlib import Path
@@ -6,6 +7,11 @@ from shutil import copy
 from reflink import reflink, supported_at
 
 from peets.entities import MediaEntity, MediaFileType
+
+class Op(Enum):
+    Copy = auto()
+    Reflink = auto()
+    Move = auto()
 
 
 def _naming(media: MediaEntity, template="{title}({year})") -> str:

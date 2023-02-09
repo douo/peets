@@ -11,6 +11,7 @@ from peets.ui.action import Action
 from itertools import chain, filterfalse
 from os import getcwd
 
+
 def main():
     parser = ArgumentParser(description="scrape movie")
     parser.add_argument("-l", "--library",
