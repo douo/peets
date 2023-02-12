@@ -56,7 +56,7 @@ def _do_process(media: MediaEntity, lib: Library):
 
         parsed.append((MediaFileType.NFO, Path(f.name)))
     media = data_replace(media, media_files=media.media_files + parsed)
-    naming.do_copy(media, lib.path, lib.config.naming_style)
+    naming.do_copy(media, lib)
 
     return Action.NEXT
 

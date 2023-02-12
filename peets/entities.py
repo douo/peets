@@ -5,7 +5,7 @@ from dataclasses import dataclass, field, is_dataclass, asdict
 from datetime import datetime, date
 from enum import Enum, auto
 from pathlib import Path
-from typing import TypeAlias, Iterator
+from typing import TypeAlias, Iterator, Any
 from uuid import UUID, uuid4
 from itertools import groupby
 from operator import attrgetter
@@ -15,8 +15,17 @@ from peets.iso import Country
 
 class EntityJsonEncoder(json.JSONEncoder):
     def default(self, o):
+        print(f"default {o=}")
         if is_dataclass(o):
-            return asdict(o)
+            # fix json module: TypeError: keys must be str, int, float, bool or None, not XXX
+            def _sanitize(o):
+                if isinstance(o, dict):
+                    return {_sanitize(k): v for k, v in o.items()}
+                elif isinstance(o, Enum):
+                    return o.name
+                else:
+                    return o
+            return {k: _sanitize(v) for k, v in  asdict(o).items()}
         elif isinstance(o, Enum):
             return o.name
         elif isinstance(o, Path):
@@ -27,6 +36,7 @@ class EntityJsonEncoder(json.JSONEncoder):
             return o.isoformat()
         else:
             return super().default(o)
+
 
 
 class MediaCertification(Enum):
@@ -565,10 +575,10 @@ class MediaTrailer:
 
 
 class PersonType(Enum):
-    ACTOR = (auto(),)
-    DIRECTOR = (auto(),)
-    WRITER = (auto(),)
-    PRODUCER = (auto(),)
+    ACTOR = auto()
+    DIRECTOR = auto()
+    WRITER = auto()
+    PRODUCER = auto()
     OTHER = auto()
 
 

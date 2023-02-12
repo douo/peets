@@ -84,8 +84,6 @@ NfoItem: TypeAlias = (
 NfoTable: TypeAlias = list[NfoItem]
 
 
-
-
 def create_element(tag: str, text: str | None = None, **extra) -> ET._Element:
     ele = ET.Element(tag, **extra)
     if text:

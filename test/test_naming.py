@@ -2,6 +2,7 @@ import stat
 from os import chmod
 
 from peets.entities import MediaFileType, Movie
+from peets.library import Library
 from peets.naming import do_copy
 
 
@@ -36,12 +37,12 @@ def test_do_copy_simple_naming(tmp_path, create_file):
         media_files=media_files,
     )
 
-    lib_path = tmp_path.joinpath("dst")
+    lib = Library(tmp_path.joinpath("dst"))
 
     # simple
-    do_copy(movie, lib_path, naming_style="simple")
+    do_copy(movie, lib)
 
-    parent = lib_path.joinpath("movie", "Title (2022)")
+    parent = lib.path.joinpath("movie", "Title (2022)")
     assert parent.exists()
     assert set(f.name for f in parent.iterdir()) == set(
         ["Title (2022) 2160p AAC.mkv", "movie.nfo", "poster.jpg", "banner.jpg"]
@@ -79,12 +80,14 @@ def test_do_copy(tmp_path, create_file):
         media_files=[(t, create_file(n, "src")) for t, n in media_files],
     )
 
-    lib_path = tmp_path.joinpath("dst")
 
+
+    lib = Library(tmp_path.joinpath("dst"))
+    lib.config.media_file_naming_style = "full"
     # simple
-    do_copy(movie, lib_path, naming_style="full")
+    do_copy(movie, lib)
 
-    parent = lib_path.joinpath("movie", "Title (2022)")
+    parent = lib.path.joinpath("movie", "Title (2022)")
     assert parent.exists()
     assert set(f.name for f in parent.iterdir()) == set(
         [

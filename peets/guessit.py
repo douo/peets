@@ -69,7 +69,7 @@ def create_entity(path: Path, processed: set = set()) -> MediaEntity | NonMedia:
     """
     one file one movie
     """
-    if path in processed:
+    if path.absolute() in processed:
         return NonMedia.PROCESSED
 
     # 只能处理视频文件
