@@ -36,6 +36,7 @@ def _set(movie: Movie) -> list[ET._Element]:
         collectionId = ET.Element("tmdbCollectionId")
         collectionId.text = str(ms.tmdb_id)
         return [set_, collectionId]
+    return []
 
 
 def _showlinks(showlinks) -> list[ET._Element]:

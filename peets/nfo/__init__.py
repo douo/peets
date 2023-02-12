@@ -4,7 +4,8 @@ import inspect
 from abc import ABC, abstractmethod
 from datetime import datetime
 from types import FunctionType
-from typing import Callable, Generic, TypeAlias, TypeVar, get_type_hints
+from typing import Callable, Generic, TypeAlias, TypeVar, IO, get_type_hints
+from guessit.api import Path
 
 from lxml import etree as ET
 
@@ -28,9 +29,12 @@ def pprint(doc: ET._Element):
     pprint.PrettyPrinter(indent=4).pprint(_tostring(doc).decode("UTF-8"))
 
 
-def write_to(doc: ET._Element):
+def write_to(doc: ET._Element, path: Path | IO):
     text = _tostring(doc)
-    # TODO
+    if isinstance(path, Path):
+        path.write_text(text)
+    else:
+        path.write(text)
 
 class Connector(ABC, Generic[T]):
     def __init__(self, name: str) -> None:
@@ -44,6 +48,10 @@ class Connector(ABC, Generic[T]):
             return ET.ElementTree(root)
         else:
             return root
+
+
+    def write_to(self, media: T, path: Path | IO, wrap=True):
+        write_to(self.generate(media=media, wrap=wrap), path)
 
 
     def _get_root_name(self, media: T) -> str:
@@ -60,7 +68,6 @@ class Connector(ABC, Generic[T]):
 
     def is_available(self, media: T) -> bool:
         return type(media).__name__.lower() in [t.lower() for t in self.available_type]
-
 
 # TODO 追加一个 trigger ，只有 trigger 返回 True, 该 Item 才会生效
 # TODO trigger 默认可以是 field not None
@@ -114,6 +121,7 @@ def _process(item: NfoItem, root: ET._Element, entity: MediaEntity):
         case _:
             raise ValueError(f"Unrecognized Nfoitem {item=} {type(item)=}")
 
+    print(item)
     if return_type == ET._Element or isinstance(child, ET._Element):
         root.append(child)
     elif return_type == list[ET._Element] or (

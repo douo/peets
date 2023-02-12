@@ -1,4 +1,6 @@
 from pylsp import hookspecs
+from peets.config import Config
+from peets._plugin import Plugin
 
 from peets.entities import (
     MediaAiredStatus,
@@ -10,18 +12,19 @@ from peets.entities import (
     TvShowEpisode,
 )
 from peets.iso import Country, Language
-from peets import manager, get_config
 from peets.tmdb import TmdbMetadataProvider
 from peets.nfo import pprint
+from peets.nfo.kodi import MovieKodiConnector, TvShowKodiConnector, TvShowEpisodeKodiConnector
+
 
 
 def test_detail(hijack, dummy):
     # m = dummy(Movie)  # FIXME buggy
     print = pprint
     data = hijack("movie.json")
-    tmdb = TmdbMetadataProvider(get_config())
+    tmdb = TmdbMetadataProvider(Config())
     m = tmdb.apply(Movie(), id_=0)
-    c = manager.connectors(m)[0]
+    c = MovieKodiConnector(Config())
     print(c.generate(m))
 
 
@@ -30,9 +33,9 @@ def test_detail(hijack, dummy):
     episodes = [TvShowEpisode(season=1, episode=1)]
     m = tmdb.apply(TvShow(episodes=episodes), id_=0)
 
-    c = manager.connectors(m)[0]
+    c = TvShowKodiConnector(Config())
     print(c.generate(m))
 
     for e in m.episodes:
-        c = manager.connectors(e)[0]
+        c = TvShowEpisodeKodiConnector(Config())
         print(c.generate(e))

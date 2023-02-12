@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import sys
 from functools import cache
-from typing import Any, Callable, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
 
 from pluggy import HookimplMarker, HookspecMarker, PluginManager
 
@@ -13,8 +15,13 @@ from peets.nfo.kodi import (
 )
 from peets.scraper import Feature, MetadataProvider, Provider
 from peets.tmdb import TmdbArtworkProvider, TmdbMetadataProvider
-from peets.ui.action import MediaUI, MovieUI, TvShowUI
+from peets.ui import MediaUI, MovieUI, TvShowUI
 from peets.entities import MediaEntity
+
+
+if TYPE_CHECKING:
+    from peets.library import Library
+
 
 # 保留函数的 type annotations
 _F = TypeVar("_F", bound=Callable[..., Any])
@@ -30,16 +37,16 @@ def spec(func: _F) -> _F:
 
 
 @spec
-def get_providers(  # type: ignore[return,empty-body]
+def get_providers(
     config: Config,
-) -> Provider | tuple[Provider, ...]:
+) -> Provider | tuple[Provider, ...]:  # type: ignore[return,empty-body]
     pass
 
 
 @spec
-def get_connectors(  # type: ignore[return,empty-body]
+def get_connectors(
     config: Config,
-) -> Connector | tuple[Provider, ...]:
+) -> Connector | tuple[Provider, ...]:  # type: ignore[return,empty-body]
     pass
 
 
@@ -61,13 +68,13 @@ def get_connectors_impl(config: Config) -> Connector | tuple[Connector, ...]:
 
 
 @spec
-def provide_uis() -> type[U] | tuple[type[U], ...]:  # type: ignore[return,empty-body]
+def provide_uis(lib: Library) -> U | tuple[U, ...]:  # type: ignore[return,empty-body]
     pass
 
 
 @impl(specname="provide_uis")
-def provide_uis_impl() -> type[U] | tuple[type[U], ...]:
-    return (MovieUI, TvShowUI)
+def provide_uis_impl(lib: Library) -> U | tuple[U, ...]:
+    return (MovieUI(lib), TvShowUI(lib))
 
 
 def _flat(result: T | list[T | tuple[T]]) -> list[T]:
@@ -84,9 +91,9 @@ def _flat(result: T | list[T | tuple[T]]) -> list[T]:
 
 
 class Plugin:
-    def __init__(self, config) -> None:
+    def __init__(self, lib: Library) -> None:
         self.manager: PluginManager = PluginManager(NAME)
-        self.config = config
+        self.lib = lib
         self.manager.add_hookspecs(sys.modules[__name__])
         self._register_internal()
 
@@ -99,7 +106,7 @@ class Plugin:
 
     @cache
     def get_providers(self) -> list[Provider]:
-        return _flat(self.manager.hook.get_providers(config=self.config))
+        return _flat(self.manager.hook.get_providers(config=self.lib.config))  # type: ignore
 
     def metadata(self, media: E) -> list[MetadataProvider[E]]:
         return [
@@ -117,12 +124,16 @@ class Plugin:
 
     @cache
     def get_connectors(self) -> list[Connector]:
-        return _flat(self.manager.hook.get_connectors(config=self.config))
+        return _flat(self.manager.hook.get_connectors(config=self.lib.config))  # type: ignore
 
     def connectors(self, media: E) -> list[Connector[E]]:
         return [c for c in self.get_connectors() if c.is_available(media)]
 
-    def get_ui(self, type_: type[E]) -> type[U]:
-        uis = provide_uis_impl()
+    @cache
+    def _get_ui(self, type_ : type[E]) -> U:
+        uis = _flat(self.manager.hook.provide_uis(lib=self.lib))  # type: ignore
         target = f"{type_.__name__}UI"
-        return next(u for u in uis if u.__name__ == target)
+        return next(u for u in uis if type(u).__name__ == target)
+
+    def get_ui(self, media: E) -> U:
+        return self._get_ui(type(media))

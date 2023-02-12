@@ -1,27 +1,25 @@
 from __future__ import annotations
 
 import os
-import json
 import readline
-import tempfile
 from abc import ABC, abstractmethod
-from dataclasses import asdict, replace as data_replace
 from enum import Enum
 from functools import partial
-from itertools import groupby, chain
-from pathlib import Path
-from typing import Callable, Generic, Iterable, TypeVar, get_type_hints
+from itertools import chain
+from typing import Callable, Generic, Iterable, TypeVar, get_type_hints, TYPE_CHECKING
 
-import requests
-from teletype.components import ChoiceHelper, SelectOne, SelectMany
+from teletype.components import ChoiceHelper, SelectMany, SelectOne
 from teletype.io import get_key, style_input
-from operator import attrgetter
 
-from peets.entities import MediaEntity, MediaFileType, Movie, TvShow, TvShowEpisode
+from peets.entities import MediaEntity, Movie, TvShow, TvShowEpisode
+
 from peets.merger import replace
 from peets.scraper import MetadataProvider, Provider
 from peets.util.type_utils import check_iterable_type, is_assignable
 
+
+if TYPE_CHECKING:
+    from peets.library import Library
 
 
 class Action(Enum):
@@ -41,6 +39,10 @@ T = TypeVar("T", bound=MediaEntity)
 
 
 class MediaUI(ABC, Generic[T]):
+
+    def __init__(self, lib:Lirary):
+        self.lib = lib
+
     @abstractmethod
     def brief(self, media: T):
         pass
@@ -62,10 +64,10 @@ class MovieUI(MediaUI[Movie]):
 
     def ops(self) -> list[Op]:
         return [
-            search_op(),
-            fill_op(),
+            search_op(self.lib),
+            fill_op(self.lib),
             edit_op([modify_op("title"), modify_op("year")]),
-            view_op()
+            view_op(),
         ]
 
 
@@ -84,21 +86,21 @@ class TvShowUI(MediaUI[TvShow]):
             text = ",".join(e_list)
             print(f"Season {k}({len(e_list)}): {text}")
 
-
     def ops(self) -> list[Op]:
         return [
-            search_op(),
-            fill_op(),
+            search_op(self.lib),
+            fill_op(self.lib),
             edit_op([modify_op("title"), modify_op("year")]),
             view_op(),
-            ("List...", list_season)
+            ("List...", list_season),
         ]
 
-def list_season(media: TvShow)-> TvShow:
+
+def list_season(media: TvShow) -> TvShow:
     def _ops(media: TvShow) -> list[Op]:
         seasons = [k for (k, _) in media.episode_groupby_season()]
         all_ = [("All", list_episode("all"))]
-        return [(f"Season {k}", list_episode(k))  for k in seasons] + all_
+        return [(f"Season {k}", list_episode(k)) for k in seasons] + all_
 
     return select(media, _ops, "Season")
 
@@ -111,12 +113,17 @@ def list_episode(season_tag: int | str):
                 episodes = list(chain(*[list(v) for (_, v) in groups]))
             else:
                 episodes = next(v for (k, v) in groups if k == season_tag)
-            ops = [(f"S{e.season}E{e.episode}:{e.main_video().name}", view_episode(e)) for e in episodes]
+            ops = [
+                (f"S{e.season}E{e.episode}:{e.main_video().name}", view_episode(e))
+                for e in episodes
+            ]
             ops.append(("batch edit Season...", batch_edit_season(season_tag)))
             return ops
 
         return select(media, _ops, f"Season {season_tag}")
+
     return _inner
+
 
 def batch_edit_season(season_tag: int | str):
     def _inner(media: TvShow) -> TvShow:
@@ -126,59 +133,53 @@ def batch_edit_season(season_tag: int | str):
                 episodes = list(chain(*[list(v) for (_, v) in groups]))
             else:
                 episodes = next(v for (k, v) in groups if k == season_tag)
-            return [(f"S{e.season}E{e.episode}:{e.main_video().name}", e) for e in episodes]
+            return [
+                (f"S{e.season}E{e.episode}:{e.main_video().name}", e) for e in episodes
+            ]
 
         while True:
             pick = hint(parse_ops(_ops(media)), "Batch Edit Season", select_many=True)
             if pick:
                 value = style_input(f"Season:", style=["blue", "bold"])
-                breakpoint()
-                new_es = [replace(e, {"season": int(value)}) if e in pick else e for e in media.episodes]
-                media = replace(media,
-                               {"episodes": new_es})
+                new_es = [
+                    replace(e, {"season": int(value)}) if e in pick else e
+                    for e in media.episodes
+                ]
+                media = replace(media, {"episodes": new_es})
             else:
                 return media
 
     return _inner
 
 
-def view_episode(episode: TvShowEpisode) -> TvShowEpisodeUI:
-    def _inner(media: TvShow) -> TvShow:
-        ui =  TvShowEpisodeUI(media)
-        ops = ui.ops()
-        new_e = select(episode, ops, "Action", ui = ui)
+def view_episode(episode: TvShowEpisode):
+    def _inner(tvshow: TvShow) -> TvShow:
+        def brief(media: TvShowEpisode):
+            print(f"Type: {type(media).__name__}")
+            print(f"Title: {media.title}")
+            print(f"Episode: {media.episode}")
+            print(f"Season: {media.season}")
+            for k, v in media.ids.items():
+                print(f"{k}: {v}")
+            for mf in media.media_files:
+                print(f"{mf[0].name}: {mf[1]}")
+
+        ops = [edit_op([modify_op("title"), modify_op("episode"), modify_op("season")]),
+               view_op(),
+               ]
+        new_e = select(episode, ops, "Action", brief = brief)
         if new_e != episode:
-            new_es = [(new_e if e.dbid == new_e.dbid else e) for e in media.episodes ]
-            return replace(media,
-                           {"episodes": new_es})
+            new_es = [(new_e if e.dbid == new_e.dbid else e) for e in tvshow.episodes]
+            return replace(tvshow, {"episodes": new_es})
         else:
-            return media
+            return tvshow
+
     return _inner
 
 
-
-class TvShowEpisodeUI(MediaUI[TvShowEpisode]):
-    def __init__(self, tvshow:Tvshow):
-        self.tvshow = tvshow
-
-    def brief(self, media: TvShowEpisode):
-        print(f"Type: {type(media).__name__}")
-        print(f"Title: {media.title}")
-        print(f"Episode: {media.episode}")
-        print(f"Season: {media.season}")
-        for k, v in media.ids.items():
-            print(f"{k}: {v}")
-        for mf in media.media_files:
-            print(f"{mf[0].name}: {mf[1]}")
-
-
-    def ops(self) -> list[Op]:
-        return [
-            edit_op([modify_op("title"), modify_op("episode"), modify_op("season")]),
-            view_op()
-        ]
-
-def parse_ops(ops: list[Op], last_first=False) -> list[ChoiceHelper[OpCallable | OpResult]]:
+def parse_ops(
+    ops: list[Op], last_first=False
+) -> list[ChoiceHelper[OpCallable | OpResult]]:
     return _to_choices(ops, last_first)
 
 
@@ -198,7 +199,9 @@ def _to_choices(ops: list[tuple[str, R]], last_first=False) -> list[ChoiceHelper
         except StopIteration:
             return next(c for c in s if c.isalpha())
 
-    def _generate_mnemonic(ops: list[tuple[str, R]], exclude=[]) -> list[ChoiceHelper[R]]:
+    def _generate_mnemonic(
+        ops: list[tuple[str, R]], exclude=[]
+    ) -> list[ChoiceHelper[R]]:
         keys = list(exclude)
         for op in ops:
             dsc = op[0]
@@ -226,8 +229,7 @@ def _to_choices(ops: list[tuple[str, R]], last_first=False) -> list[ChoiceHelper
             if not found:
                 keys.append("\0")
 
-        return keys[len(exclude):]
-
+        return keys[len(exclude) :]
 
     last_op = ops[-1:] if last_first else []
     _ops = ops[:-1] if last_first else ops
@@ -235,19 +237,24 @@ def _to_choices(ops: list[tuple[str, R]], last_first=False) -> list[ChoiceHelper
     keys = _generate_mnemonic(_ops, last_key) + last_key
 
     return [
-            ChoiceHelper(
-                v[1], label=v[0], mnemonic_style=["green", "bold", "underline"], mnemonic=k
-            )
-            for k, v in zip(keys, ops)
-        ]
+        ChoiceHelper(
+            v[1], label=v[0], mnemonic_style=["green", "bold", "underline"], mnemonic=k
+        )
+        for k, v in zip(keys, ops)
+    ]
 
 
-
-
-def select(media: T, ops: list[Op] | Callable[[T], list[Op]], label: str, quit_label = "Back", ui: MediaUI | None = None) -> T:
+def select(
+    media: T,
+    ops: list[Op] | Callable[[T], list[Op]],
+    label: str,
+    quit_label: str | None = "Back",
+    brief: Callable | None = None,
+) -> T:
     """
     生成一个可返回的选择菜单
     """
+
     def _build_ops() -> list[Op]:
         if callable(ops):
             _ops = ops(media)
@@ -258,25 +265,25 @@ def select(media: T, ops: list[Op] | Callable[[T], list[Op]], label: str, quit_l
 
         return parse_ops(_ops, last_first=bool(quit_label))
 
-    if ui:
-        ui.brief(media)
+    if brief:
+        brief(media)
     while True:
         pick = hint(_build_ops(), label)
         result = pick(media) if callable(pick) else pick
         match result:
             case MediaEntity():
                 media = result
-                if ui:
-                    ui.brief(media)
+                if brief:
+                    brief(media)
             case dict():
                 media = replace(media, **result)
-                if ui:
-                    ui.brief(media)
+                if brief:
+                    brief(media)
             case Action.NEXT | Action.QUIT:
                 return media
             case _:
-                if ui:
-                    ui.brief(media)
+                if brief:
+                    brief(media)
 
 
 def hint(ops: list[ChoiceHelper], label: str, select_many=False) -> Any:
@@ -301,10 +308,8 @@ def hint(ops: list[ChoiceHelper], label: str, select_many=False) -> Any:
         return SelectOne(ops).prompt("=" * width)
 
 
-
-
-def _pick_metadata_scraper(media: T) -> MetadataProvider[T]:
-    scrapers = manager.metadata(media)
+def _pick_metadata_scraper(media: T, lib: Library) -> MetadataProvider[T]:
+    scrapers = lib.manager.metadata(media)
     if len(scrapers) > 1:
         choices = [ChoiceHelper(s, label=f"{type(s)}", style="bold") for s in scrapers]
         return SelectOne(choices).prompt()
@@ -312,8 +317,8 @@ def _pick_metadata_scraper(media: T) -> MetadataProvider[T]:
         return scrapers[0]
 
 
-def _pick_artwork_scraper(media: T) -> Provider[T]:
-    scrapers = manager.artwork(media)
+def _pick_artwork_scraper(media: T, lib: Library) -> Provider[T]:
+    scrapers = lib.manager.artwork(media)
     if len(scrapers) > 1:
         choices = [ChoiceHelper(s, label=f"{type(s)}", style="bold") for s in scrapers]
         return SelectOne(choices).prompt()
@@ -321,19 +326,20 @@ def _pick_artwork_scraper(media: T) -> Provider[T]:
         return scrapers[0]
 
 
-def fill_op() -> Op:
+def fill_op(lib: Library) -> Op:
     def do_fill(media: T) -> T:
-        scraper = _pick_metadata_scraper(media)
+        scraper = _pick_metadata_scraper(media, lib)
         id_ = style_input(f"{type(scraper)} id:", style=["blue", "bold"])
         new_ = scraper.apply(media, id_=int(id_))
-        scraper = _pick_metadata_scraper(media)
+        scraper = _pick_metadata_scraper(media, lib)
         return scraper.apply(new_)
 
-    return  ("fetch by Id", do_fill)
+    return ("fetch by Id", do_fill)
 
-def search_op() -> Op:
+
+def search_op(lib: Library) -> Op:
     def do_search(media: MediaEntity):
-        scraper = _pick_metadata_scraper(media)
+        scraper = _pick_metadata_scraper(media, lib)
         result = scraper.search(media)
         if result:
             choices = [
@@ -358,7 +364,9 @@ def search_op() -> Op:
 def modify_op(attr: str) -> Op:
     def _modify(media: T, attr: str) -> T:
         promt = "".join(ele.title() for ele in attr.split("_"))
-        readline.set_startup_hook(lambda: readline.insert_text(str(getattr(media, attr))))
+        readline.set_startup_hook(
+            lambda: readline.insert_text(str(getattr(media, attr)))
+        )
         try:
             value = style_input(f"{promt}:", style=["blue", "bold"])
         finally:
@@ -375,6 +383,7 @@ def edit_op(extends: list[Op] = []) -> Op:
         return select(media, extends + [("edit by Field", _edit_by_field)], "Edit")
 
     return ("Edit...", do_edit)
+
 
 def _edit_by_field(media: T) -> T:
     def _type_filter(type_: type) -> bool:
@@ -396,6 +405,7 @@ def _edit_by_field(media: T) -> T:
     return select(
         media, [(f[0], partial(_edit_field, attr=f)) for f in fs], "View by Field"
     )
+
 
 def view_op():
     def do_view(media: T):

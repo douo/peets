@@ -9,7 +9,10 @@ from peets.entities import (
 )
 from peets.iso import Country, Language
 from peets.tmdb import TmdbArtworkProvider, TmdbMetadataProvider
-from peets import get_config
+from peets.config import Config
+
+def get_config()->Config:
+    return Config()
 
 def test_detail(hijack):
     data = hijack("movie.json")

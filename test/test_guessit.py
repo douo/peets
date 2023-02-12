@@ -4,7 +4,7 @@ from pytest import fixture
 
 from peets.entities import MediaEntity, MediaFileType, Movie, TvShow
 from peets.guessit import NonMedia, create_entity
-from peets.ui import interact
+from peets.ui.entry import interact
 
 
 @fixture
