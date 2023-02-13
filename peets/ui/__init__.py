@@ -8,7 +8,7 @@ from functools import partial
 from itertools import chain
 from typing import Callable, Generic, Iterable, TypeVar, get_type_hints, TYPE_CHECKING
 
-from teletype.components import ChoiceHelper, SelectMany, SelectOne
+from teletype.components import ChoiceHelper, SelectMany, SelectOne, SelectApproval
 from teletype.io import get_key, style_input
 
 from peets.entities import MediaEntity, Movie, TvShow, TvShowEpisode
@@ -118,6 +118,7 @@ def list_episode(season_tag: int | str):
                 for e in episodes
             ]
             ops.append(("batch edit Season...", batch_edit_season(season_tag)))
+            ops.append(("Delete...", delete_episode(season_tag)))
             return ops
 
         return select(media, _ops, f"Season {season_tag}")
@@ -150,6 +151,38 @@ def batch_edit_season(season_tag: int | str):
                 return media
 
     return _inner
+
+def delete_episode(season_tag: int | str):
+    def _inner(media: TvShow) -> TvShow:
+        def _ops(media: TvShow) -> list[Op]:
+            groups = media.episode_groupby_season()
+            if season_tag == "all":
+                episodes = list(chain(*[list(v) for (_, v) in groups]))
+            else:
+                episodes = next(v for (k, v) in groups if k == season_tag)
+            return [
+                (f"S{e.season}E{e.episode}:{e.main_video().name}", e) for e in episodes
+            ]
+
+        while True:
+            pick = hint(parse_ops(_ops(media)), "Delete Episode", select_many=True)
+            if pick:
+                text = ", ".join([f"S{e.season}E{e.episode}" for e in pick])
+                print(f"Confirm Delete({text}):")
+                if SelectApproval().prompt():
+                    new_es = [
+                        e
+                        for e in media.episodes
+                        if e not in pick
+                    ]
+                    media = replace(media, {"episodes": new_es})
+            else:
+                return media
+        return media
+
+    return _inner
+
+
 
 
 def view_episode(episode: TvShowEpisode):
@@ -329,10 +362,10 @@ def _pick_artwork_scraper(media: T, lib: Library) -> Provider[T]:
 def fill_op(lib: Library) -> Op:
     def do_fill(media: T) -> T:
         scraper = _pick_metadata_scraper(media, lib)
-        id_ = style_input(f"{type(scraper)} id:", style=["blue", "bold"])
-        new_ = scraper.apply(media, id_=int(id_))
-        scraper = _pick_metadata_scraper(media, lib)
-        return scraper.apply(new_)
+        source = scraper.source
+        id_ = media.ids.get(source)
+        id_ = input_(f"{type(scraper)} id", id_)
+        return scraper.apply(media, id_=id_)
 
     return ("fetch by Id", do_fill)
 
@@ -361,17 +394,23 @@ def search_op(lib: Library) -> Op:
     return ("Search", do_search)
 
 
+def input_(promt, default=None):
+    if default:
+        readline.set_startup_hook(
+            lambda: readline.insert_text(default)
+        )
+        try:
+            return style_input(f"{promt}:", style=["blue", "bold"])
+        finally:
+            readline.set_startup_hook()
+    else:
+        return style_input(f"{promt}:", style=["blue", "bold"])
+
+
 def modify_op(attr: str) -> Op:
     def _modify(media: T, attr: str) -> T:
         promt = "".join(ele.title() for ele in attr.split("_"))
-        readline.set_startup_hook(
-            lambda: readline.insert_text(str(getattr(media, attr)))
-        )
-        try:
-            value = style_input(f"{promt}:", style=["blue", "bold"])
-        finally:
-            readline.set_startup_hook()
-        # FIXME
+        value = input_(promt, str(getattr(media, attr)))
         type_ = get_type_hints(type(media))[attr]
         return replace(media, {attr: type_(value)})
 

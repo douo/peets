@@ -52,3 +52,7 @@ class TmdbArtworkProvider(Provider[MediaEntity]):
     @property
     def features(self) -> list[Feature]:
         return [Feature.Artwork]
+
+    @property
+    def source(self) -> str:
+        return "tmdb"

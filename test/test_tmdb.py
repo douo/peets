@@ -62,8 +62,8 @@ def test_tvshow(hijack):
     hijack("tvshow.json", "tmdbsimple.TV._GET")
     hijack("season.json", "tmdbsimple.TV_Seasons._GET")
     tmdb = TmdbMetadataProvider(get_config())
-    episodes = [TvShowEpisode(season=1, episode=1)]
-    m = tmdb.apply(TvShow(episodes=episodes), id_=0)
+    episodes = [TvShowEpisode(season=1, episode=1), TvShowEpisode(season=1, episode=150), TvShowEpisode(season=-1, episode=1)]
+    m:TvShow = tmdb.apply(TvShow(episodes=episodes), id_=0)
 
     assert m.ids["tmdb"] == "95396"
     assert m.title == "Severance"
@@ -89,10 +89,14 @@ def test_tvshow(hijack):
     assert s.name == "第 1 季"
     assert s.season == 1
 
-    assert len(m.episodes) == 1
-    e = m.episodes[0]
+    assert len(m.episodes) == 3
+    e = m.retrieve_episode(1,1)
+    assert(e)
     assert e.first_aired == "2022-02-17"
     assert e.ids["tmdb"] == "1982925"
     assert e.season == 1
     assert e.episode == 1
     assert len(e.actors) == 9
+
+    assert(m.retrieve_episode(-1,1))
+    assert(m.retrieve_episode(1,150))

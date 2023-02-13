@@ -40,6 +40,12 @@ class Provider(ABC, Generic[T]):
     def features(self) -> list[Feature]:
         pass
 
+    @property
+    @abstractmethod
+    def source(self) -> str:
+        pass
+
+
     def is_available(self, media: T) -> bool:
         return type(media).__name__.lower() in [
             t.lower() for t in self.available_type

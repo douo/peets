@@ -42,6 +42,12 @@ class TmdbMetadataProvider(MetadataProvider[Movie]):
 
         tmdb.API_KEY = config.tmdb_key  # side effect
 
+
+    @property
+    def source(self) -> str:
+        return "tmdb"
+
+
     @property
     def available_type(self) -> list[str]:
         return ["movie", "tvshow"]
@@ -233,17 +239,11 @@ class TmdbMetadataProvider(MetadataProvider[Movie]):
                 ),
             ),
         ]
-        episodes = []
-        for key, group in itertools.groupby(tvshow.episodes, lambda e: e.season):
-            season_context = tmdb.TV_Seasons(m_id, key).info(language=self.language)
-            for episode in group:
-                context = season_context["episodes"][episode.episode - 1]
-                episodes.append(replace(episode, context, episode_table))
 
         api = tmdb.TV(m_id)
         tv_context = api.info(
             language=self.language,
-            append_to_response="credits, external_ids, content_ratings, keywords",
+            append_to_response="credits,external_ids,content_ratings,keywords",
         )
         season_table: ConvertTable = [
             ("plot", "overview"),
@@ -334,6 +334,22 @@ class TmdbMetadataProvider(MetadataProvider[Movie]):
         ]
 
         tvshow = replace(tvshow, tv_context, table)
+
+        episodes = []
+        seasons_from_api = [s.season for s in tvshow.seasons]
+        for season, episodes_groupby in tvshow.episode_groupby_season():
+            if season in seasons_from_api:
+                season_context = tmdb.TV_Seasons(m_id, season).info(language=self.language)
+                episodes_from_api = season_context["episodes"]
+                for episode in episodes_groupby:
+                    if episode.episode >=0 and episode.episode < len(episodes_from_api):
+                        context = episodes_from_api[episode.episode - 1]
+                        episodes.append(replace(episode, context, episode_table))
+                    else:
+                        episodes.append(episode)
+            else:
+                episodes+=list(episodes_groupby)
+
         return dataclasses.replace(tvshow, episodes=episodes)
 
     # 按本地化、US、原始发行国的顺序取值
