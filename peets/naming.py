@@ -61,12 +61,11 @@ def do_copy(media: MediaEntity, lib: Library):
     parent.mkdir(parents=True)
 
     # main video
-    main_video_path = media.main_video()
-    new_path = parent.joinpath(f"{prefix}{main_video_path.suffix}")
-
-    lib.record(*_op(main_video_path, new_path, config.op))
-
-    mod = stat.S_IMODE(new_path.stat().st_mode)
+    mod = None
+    if main_video_path := media.main_video():
+        new_path = parent.joinpath(f"{prefix}{main_video_path.suffix}")
+        lib.record(*_op(main_video_path, new_path, config.op))
+        mod = stat.S_IMODE(new_path.stat().st_mode)
     # other media file
 
     simple = "simple" == config.media_file_naming_style
@@ -76,4 +75,5 @@ def do_copy(media: MediaEntity, lib: Library):
             n = parent.joinpath(f"{media_file_selected(t)}{p.suffix}")
             lib.record(*_op(p, n, Op.Copy))  # TODO performance matter
             # 与主视频文件的权限保持一致
-            chmod(n, mod)
+            if mod:
+                chmod(n, mod)

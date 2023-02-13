@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from pytest import fixture
+from typing import cast
 
 from peets.entities import MediaEntity, MediaFileType, Movie, TvShow
 from peets.guessit import NonMedia, create_entity
@@ -179,7 +180,7 @@ def test_create_tvshow(create_file):
 
 
 def test_create_multiple_episodes_tvshow(create_file):
-    f1 = create_file("Firefly - S01E01-02 - Serenity & The Train Job.mkv")
+    f1 = create_file("Firefly - S01E01-02 - Serenity & The Train Job.mkv", parent="Firefly")
     # media file
     mf = [
         f"{f1.stem}.nfo",
@@ -201,9 +202,9 @@ def test_create_multiple_episodes_tvshow(create_file):
         MediaFileType.POSTER,
     ]
 
-    mf = create_file(mf)
+    mf = create_file(mf, parent="Firefly")
 
-    m = create_entity(f1)
+    m:TvShow = cast(TvShow, create_entity(f1))
 
     assert len(m.episodes) == 2
     e1_mf = [

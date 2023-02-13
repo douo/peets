@@ -53,7 +53,7 @@ class MovieKodiConnector(Connector[Movie]):
     def available_type(self) -> list[str]:
         return ["movie"]
 
-    def _nfo_table(self, _: Movie) -> NfoTable:
+    def _nfo_table(self, _: Movie, belong_to) -> NfoTable:
         return [
             "title",
             ("originaltitle", "original_title"),

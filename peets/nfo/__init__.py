@@ -9,7 +9,7 @@ from guessit.api import Path
 
 from lxml import etree as ET
 
-from peets.entities import MediaEntity
+from peets.entities import EntityCollection, MediaEntity
 from peets.util.type_utils import check_iterable_type
 
 T = TypeVar("T", bound=MediaEntity)
@@ -40,9 +40,9 @@ class Connector(ABC, Generic[T]):
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def generate(self, media: T, wrap=True) -> ET._Element:
+    def generate(self, media: T, belong_to: EntityCollection | None = None, wrap=True) -> ET._Element:
         root = ET.Element(self._get_root_name(media))
-        inflate(root, media, self._nfo_table(media))
+        inflate(root, media, self._nfo_table(media, belong_to = belong_to))
         if wrap:
             root.addprevious(ET.Comment(f"created on {datetime.now().isoformat()}"))
             return ET.ElementTree(root)
@@ -50,15 +50,15 @@ class Connector(ABC, Generic[T]):
             return root
 
 
-    def write_to(self, media: T, path: Path | IO, wrap=True):
-        write_to(self.generate(media=media, wrap=wrap), path)
+    def write_to(self, media: T, path: Path | IO, belong_to: EntityCollection | None = None, wrap=True):
+        write_to(self.generate(media=media, belong_to=belong_to, wrap=wrap), path)
 
 
     def _get_root_name(self, media: T) -> str:
         return type(media).__name__.lower()
 
     @abstractmethod
-    def _nfo_table(self, media: T) -> NfoTable:
+    def _nfo_table(self, media: T, belong_to: EntityCollection | None = None) -> NfoTable:
         pass
 
     @property

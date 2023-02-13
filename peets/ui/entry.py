@@ -15,7 +15,7 @@ from peets.library import Library
 
 import peets.naming as naming
 from peets.ui import T, Action, Op, MediaUI, parse_ops, select
-from peets.entities import MediaEntity, MediaFileType
+from peets.entities import EntityCollection, MediaEntity, MediaFileType
 from peets.merger import replace
 from peets.scraper import MetadataProvider, Provider
 from peets.util.type_utils import check_iterable_type, is_assignable
@@ -40,7 +40,7 @@ def interact(media: MediaEntity, lib: Library) -> Action:
         return Action.QUIT
 
 
-def _do_process(media: MediaEntity, lib: Library):
+def _do_process(media: MediaEntity, lib: Library, belong_to: EntityCollection | None = None):
     # fetch online media file
     parsed: list[tuple[MediaFileType, Path]] = [
         (t, _make_sure_media_file(t, uri))
@@ -51,12 +51,16 @@ def _do_process(media: MediaEntity, lib: Library):
     if not media.has_media_file(MediaFileType.NFO):
         with tempfile.NamedTemporaryFile(suffix=".nfo", delete=False) as f:
             nfo = lib.manager.connectors(media)[0]  # FIXME
-            nfo.write_to(media, f)
+            nfo.write_to(media, f, belong_to=belong_to)
             print(f"parsing nfo to {f.name}")
 
         parsed.append((MediaFileType.NFO, Path(f.name)))
     media = data_replace(media, media_files=media.media_files + parsed)
     naming.do_copy(media, lib)
+
+    if isinstance(media, EntityCollection):
+        for e in media:
+            _do_process(e, lib, media)
 
     return Action.NEXT
 

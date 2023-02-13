@@ -38,4 +38,4 @@ def test_detail(hijack, dummy):
 
     for e in m.episodes:
         c = TvShowEpisodeKodiConnector(Config())
-        print(c.generate(e))
+        print(c.generate(e, belong_to=m))

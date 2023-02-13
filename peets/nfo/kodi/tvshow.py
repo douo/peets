@@ -108,7 +108,7 @@ class TvShowKodiConnector(Connector[TvShow]):
     def available_type(self) -> list[str]:
         return ["tvshow"]
 
-    def _nfo_table(self, _: TvShow) -> NfoTable:  # type: ignore[override]
+    def _nfo_table(self, _: TvShow, belong_to) -> NfoTable:  # type: ignore[override]
         return [
             "title",
             ("originaltitle", "original_title"),

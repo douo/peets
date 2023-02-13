@@ -30,11 +30,12 @@ class TvShowEpisodeKodiConnector(Connector[TvShowEpisode]):
     def _get_root_name(self, _) -> str:
         return "episodedetails"
 
-    def _nfo_table(self, _: TvShowEpisode) -> NfoTable:
+    def _nfo_table(self, _: TvShowEpisode, belong_to) -> NfoTable:
+        tvshow = cast(TvShow, belong_to)
         return [
             "title",
             ("originaltitle", "original_title"),
-            # ("showtitle", ),  # TODO: getTvShow().title
+            ("showtitle", lambda: tvshow.title),
             "season",
             "episode",
             ("displayseason", "display_season"),
@@ -45,7 +46,7 @@ class TvShowEpisodeKodiConnector(Connector[TvShowEpisode]):
             ("userrating", lambda ratings: ""),  # TODO userrating
             # "votes",  # IGNORE
             "plot",
-            # "runtime",  #TODO tvshow.runtime
+            ("title", lambda: tvshow.runtime),
             (
                 "thumb",
                 lambda artwork_url_map: artwork_url_map.get(MediaFileType.THUMB),

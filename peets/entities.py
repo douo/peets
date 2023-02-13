@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+from abc import abstractmethod
+
 import json
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, is_dataclass, asdict
 from datetime import datetime, date
 from enum import Enum, auto
 from pathlib import Path
-from typing import TypeAlias, Iterator, Any
+from typing import TypeAlias, Iterator, Any, TypeVar
 from uuid import UUID, uuid4
 from itertools import groupby
 from operator import attrgetter
-
+from collections.abc import Collection
 from peets.iso import Country
 
 
@@ -25,7 +28,8 @@ class EntityJsonEncoder(json.JSONEncoder):
                     return o.name
                 else:
                     return o
-            return {k: _sanitize(v) for k, v in  asdict(o).items()}
+
+            return {k: _sanitize(v) for k, v in asdict(o).items()}
         elif isinstance(o, Enum):
             return o.name
         elif isinstance(o, Path):
@@ -36,7 +40,6 @@ class EntityJsonEncoder(json.JSONEncoder):
             return o.isoformat()
         else:
             return super().default(o)
-
 
 
 class MediaCertification(Enum):
@@ -554,7 +557,7 @@ class MediaEntity:
     screen_size: str = ""
     audio_codec: str = ""
 
-    def main_video(self) -> Path:
+    def main_video(self) -> Path | None:
         return next(p for t, p in self.media_files if t is MediaFileType.VIDEO)
 
     def has_media_file(self, type_: MediaFileType) -> bool:
@@ -562,6 +565,24 @@ class MediaEntity:
 
     def to_json(self):
         return json.dumps(self, cls=EntityJsonEncoder, indent=2)
+
+T = TypeVar("T", bound=MediaEntity, covariant=True)
+
+class EntityCollection(ABC, Collection[T]):
+
+    @property
+    @abstractmethod
+    def data(self) -> Collection[T]:
+        pass
+
+    def __contains__(self, __x: object) -> bool:
+        return self.data.__contains__(__x)
+
+    def __iter__(self) -> Iterator[T]:
+        return self.data.__iter__()
+
+    def __len__(self) -> int:
+        return self.data.__len__()
 
 
 @dataclass
@@ -639,7 +660,7 @@ class MediaAiredStatus(Enum):
         self.name_ = name_
         self.possible_notations = possible_notations
 
-    UNKNOWN: tuple[str, list[str]] = ("Unknown", [])
+    UNKNOWN = ("Unknown", [])
     CONTINUING = ("Continuing", ["continuing", "returning series"])
     ENDED = ("Ended", ["ended"])
 
@@ -653,7 +674,7 @@ class MediaAiredStatus(Enum):
 
 
 @dataclass(kw_only=True)
-class TvShow(MediaEntity):
+class TvShow(MediaEntity, EntityCollection["TvShowEpisode"]):
     first_aired: str = ""  # date
     status: MediaAiredStatus = MediaAiredStatus.UNKNOWN
     runtime: int = 0  # 时长
@@ -671,17 +692,19 @@ class TvShow(MediaEntity):
     # tmdb 填充后才有数据，修改 episodes 不会动态更新该值
     seasons: list[TvShowSeason] = field(default_factory=list)
 
-    def retrieve_episode(self, season: int, episode: int) -> "TvShowEpisode" | None:
+    def retrieve_episode(self, season: int, episode: int) -> TvShowEpisode | None:
         for e in self.episodes:
             if e.season == season and e.episode == episode:
                 return e
         return None
 
-    def episode_groupby_season(self) -> Iterator[tuple[int, Iterator["TvShowEpisode"]]]:
-        e_sorted = sorted(self.episodes, key  = lambda x: (x.season, x.episode))
+    def episode_groupby_season(self) -> Iterator[tuple[int, Iterator[TvShowEpisode]]]:
+        e_sorted = sorted(self.episodes, key=lambda x: (x.season, x.episode))
         return groupby(e_sorted, attrgetter("season"))
 
-
+    @property
+    def data(self) -> Collection[TvShowEpisode]:
+        return self.episodes
 
 
 @dataclass(kw_only=True)
